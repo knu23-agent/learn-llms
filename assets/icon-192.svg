@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <!-- Background circle -->
+  <circle cx="96" cy="96" r="96" fill="#6c63ff"/>
+  <!-- Neural network icon: 3 layers of nodes connected by lines -->
+  <!-- Layer 1 (input): 2 nodes -->
+  <!-- Layer 2 (hidden): 3 nodes -->
+  <!-- Layer 3 (output): 1 node -->
+  <!-- Connections: input to hidden -->
+  <line x1="52" y1="72" x2="96" y2="60" stroke="white" stroke-width="2" stroke-opacity="0.6"/>
+  <line x1="52" y1="72" x2="96" y2="96" stroke="white" stroke-width="2" stroke-opacity="0.6"/>
+  <line x1="52" y1="72" x2="96" y2="132" stroke="white" stroke-width="2" stroke-opacity="0.6"/>
+  <line x1="52" y1="120" x2="96" y2="60" stroke="white" stroke-width="2" stroke-opacity="0.6"/>
+  <line x1="52" y1="120" x2="96" y2="96" stroke="white" stroke-width="2" stroke-opacity="0.6"/>
+  <line x1="52" y1="120" x2="96" y2="132" stroke="white" stroke-width="2" stroke-opacity="0.6"/>
+  <!-- Connections: hidden to output -->
+  <line x1="96" y1="60" x2="140" y2="96" stroke="white" stroke-width="2" stroke-opacity="0.6"/>
+  <line x1="96" y1="96" x2="140" y2="96" stroke="white" stroke-width="2" stroke-opacity="0.6"/>
+  <line x1="96" y1="132" x2="140" y2="96" stroke="white" stroke-width="2" stroke-opacity="0.6"/>
+  <!-- Input nodes -->
+  <circle cx="52" cy="72" r="12" fill="white" fill-opacity="0.95"/>
+  <circle cx="52" cy="120" r="12" fill="white" fill-opacity="0.95"/>
+  <!-- Hidden nodes -->
+  <circle cx="96" cy="60" r="12" fill="white" fill-opacity="0.95"/>
+  <circle cx="96" cy="96" r="12" fill="white" fill-opacity="0.95"/>
+  <circle cx="96" cy="132" r="12" fill="white" fill-opacity="0.95"/>
+  <!-- Output node -->
+  <circle cx="140" cy="96" r="14" fill="white" fill-opacity="0.95"/>
+</svg>

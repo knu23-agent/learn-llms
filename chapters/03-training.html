@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base href="/learn-llms/">
+  <title>Training — Learn Neural Networks & LLMs</title>
+  <meta name="description" content="How neural networks learn: loss functions, gradient descent, and backpropagation explained simply with an interactive demo.">
+  <meta name="theme-color" content="#6c63ff">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="progress-bar"></div>
+
+  <header>
+    <div class="site-title">
+      <span class="logo">🧠</span>
+      <a href="index.html" style="color:inherit;text-decoration:none;">Learn Neural Networks &amp; LLMs</a>
+    </div>
+    <div class="header-nav">
+      <a href="index.html">← All Chapters</a>
+      <button id="theme-toggle" aria-label="Toggle theme">☀️ Light</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="chapter-container">
+
+      <div class="chapter-meta">
+        <span class="chap-num">Chapter 3 of 6</span>
+      </div>
+
+      <h1>📉 Training: How Networks Learn</h1>
+      <p class="chapter-intro">
+        A neural network starts with random weights and knows nothing. Training is the process
+        of nudging those weights, step by step, until the network gets good at its job.
+      </p>
+
+      <h2>The Loss Function</h2>
+      <div class="callout">
+        <strong>Key idea:</strong> We need a way to measure how wrong the network is. That's the
+        <em>loss function</em> — a single number that says "here's how badly you're doing."
+      </div>
+
+      <p>Two common loss functions:</p>
+
+      <p><strong>Mean Squared Error (MSE)</strong> — used for regression (predicting numbers):</p>
+      <pre><code><span class="code-comment"># Average of (prediction - actual)² across all examples</span>
+<span class="code-kw">def</span> <span class="code-fn">mse_loss</span>(predictions, targets):
+    <span class="code-kw">return</span> ((predictions - targets) ** <span class="code-num">2</span>).mean()</code></pre>
+
+      <p><strong>Cross-Entropy Loss</strong> — used for classification (predicting categories):</p>
+      <pre><code><span class="code-comment"># Measures the "surprise" of predicting the wrong class</span>
+<span class="code-kw">import</span> numpy <span class="code-kw">as</span> np
+
+<span class="code-kw">def</span> <span class="code-fn">cross_entropy</span>(probs, true_class):
+    <span class="code-kw">return</span> -np.log(probs[true_class])</code></pre>
+
+      <p>The lower the loss, the better the network is doing. Our goal: minimize the loss.</p>
+
+      <h2>Gradient Descent — The Foggy Hillside</h2>
+      <div class="callout">
+        <strong>Analogy:</strong> Imagine you're lost in dense fog on a hilly landscape.
+        You can't see the valley (minimum loss), but you <em>can</em> feel which direction
+        is downhill. So you take a small step downhill. Then check again. Repeat.
+        Eventually you reach the bottom.
+      </div>
+
+      <p>That's gradient descent. The "hill" is the loss landscape. The gradient tells us which
+        direction is "uphill" for each weight, so we step in the opposite direction.</p>
+
+      <p>The update rule for each weight <strong>w</strong>:</p>
+      <pre><code>w = w - learning_rate × gradient</code></pre>
+
+      <p>In code:</p>
+      <pre><code><span class="code-kw">for</span> param <span class="code-kw">in</span> model.parameters():
+    param -= learning_rate * param.grad</code></pre>
+
+      <h2>The Learning Rate</h2>
+      <p>The learning rate controls the step size. It's one of the most important hyperparameters:</p>
+      <ul>
+        <li><strong>Too large:</strong> You overshoot the minimum and bounce around (or diverge entirely)</li>
+        <li><strong>Too small:</strong> Training works but takes forever</li>
+        <li><strong>Just right:</strong> Steady, efficient descent toward a good solution</li>
+      </ul>
+
+      <h2>Backpropagation</h2>
+      <div class="callout">
+        <strong>Key idea:</strong> Backpropagation is just the chain rule from calculus applied
+        backwards through the network. It efficiently computes "how much did each weight
+        contribute to the error?"
+      </div>
+
+      <p>The process:</p>
+      <ol>
+        <li><strong>Forward pass</strong> — run the input through the network, get a prediction</li>
+        <li><strong>Compute loss</strong> — compare prediction to the true answer</li>
+        <li><strong>Backward pass</strong> — compute gradients from output layer back to input layer</li>
+        <li><strong>Update weights</strong> — subtract learning_rate × gradient from each weight</li>
+        <li><strong>Repeat</strong> — for thousands of examples across many epochs</li>
+      </ol>
+
+      <pre><code><span class="code-comment"># PyTorch training loop (the real thing)</span>
+<span class="code-kw">for</span> epoch <span class="code-kw">in</span> range(num_epochs):
+    <span class="code-kw">for</span> inputs, targets <span class="code-kw">in</span> dataloader:
+        optimizer.zero_grad()          <span class="code-comment"># clear old gradients</span>
+        predictions = model(inputs)    <span class="code-comment"># forward pass</span>
+        loss = criterion(predictions, targets)  <span class="code-comment"># compute loss</span>
+        loss.backward()                <span class="code-comment"># backpropagation</span>
+        optimizer.step()               <span class="code-comment"># update weights</span></code></pre>
+
+      <h2>🎮 Interactive Demo: Gradient Descent</h2>
+      <p>Watch gradient descent find the minimum of a simple parabola. Adjust the learning rate
+        and see how it affects the path.</p>
+
+      <div class="demo-box">
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;margin-bottom:1rem;">
+          <label style="display:flex;align-items:center;gap:0.5rem;">
+            Learning rate:
+            <input type="range" id="lr-slider" min="0.01" max="0.95" step="0.01" value="0.2" style="width:120px">
+            <span id="lr-val" style="color:var(--accent);min-width:3ch">0.20</span>
+          </label>
+          <button id="btn-step" class="btn-demo">Step</button>
+          <button id="btn-run" class="btn-demo">▶ Run</button>
+          <button id="btn-reset" class="btn-demo btn-secondary">Reset</button>
+        </div>
+        <canvas id="gd-canvas" width="640" height="300" style="width:100%;border-radius:8px;background:var(--code-bg)"></canvas>
+        <div style="margin-top:0.75rem;display:flex;gap:2rem;font-family:monospace;font-size:0.9rem;">
+          <span>Position: <strong id="gd-pos">—</strong></span>
+          <span>Loss: <strong id="gd-loss">—</strong></span>
+          <span>Steps: <strong id="gd-steps">0</strong></span>
+        </div>
+      </div>
+
+      <nav class="prev-next">
+        <a href="chapters/02-networks.html" class="prev-btn">← Chapter 2: Neural Networks</a>
+        <a href="chapters/04-llms.html" class="next-btn">Chapter 4: LLMs →</a>
+      </nav>
+
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+  <script>
+    // Gradient Descent Demo
+    const canvas = document.getElementById('gd-canvas');
+    const ctx = canvas.getContext('2d');
+    const lrSlider = document.getElementById('lr-slider');
+    const lrVal = document.getElementById('lr-val');
+    const posEl = document.getElementById('gd-pos');
+    const lossEl = document.getElementById('gd-loss');
+    const stepsEl = document.getElementById('gd-steps');
+
+    // Loss function: f(x) = (x - 3)^2 + 0.5
+    const f = x => (x - 3) ** 2 + 0.5;
+    const df = x => 2 * (x - 3); // gradient
+
+    let pos = -2;    // starting position
+    let steps = 0;
+    let running = false;
+    let animId = null;
+
+    function getLR() { return parseFloat(lrSlider.value); }
+
+    function toCanvasX(x) {
+      // x range: -3 to 9, canvas width 640
+      return ((x + 3) / 12) * canvas.width;
+    }
+    function toCanvasY(y) {
+      // y range: 0 to 15, canvas height 300
+      return canvas.height - (y / 16) * canvas.height;
+    }
+
+    function draw() {
+      const W = canvas.width, H = canvas.height;
+      ctx.clearRect(0, 0, W, H);
+
+      // Grid lines
+      ctx.strokeStyle = '#2a2a4a';
+      ctx.lineWidth = 1;
+      for (let gx = -3; gx <= 9; gx += 2) {
+        ctx.beginPath();
+        ctx.moveTo(toCanvasX(gx), 0);
+        ctx.lineTo(toCanvasX(gx), H);
+        ctx.stroke();
+      }
+      for (let gy = 0; gy <= 16; gy += 2) {
+        ctx.beginPath();
+        ctx.moveTo(0, toCanvasY(gy));
+        ctx.lineTo(W, toCanvasY(gy));
+        ctx.stroke();
+      }
+
+      // Draw curve
+      ctx.beginPath();
+      ctx.strokeStyle = '#6c63ff';
+      ctx.lineWidth = 3;
+      for (let px = 0; px <= W; px++) {
+        const x = (px / W) * 12 - 3;
+        const y = f(x);
+        const cy = toCanvasY(y);
+        if (px === 0) ctx.moveTo(px, cy);
+        else ctx.lineTo(px, cy);
+      }
+      ctx.stroke();
+
+      // Minimum marker
+      ctx.strokeStyle = '#4ecca3';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(toCanvasX(3), 0);
+      ctx.lineTo(toCanvasX(3), H);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#4ecca3';
+      ctx.font = '12px system-ui';
+      ctx.fillText('minimum', toCanvasX(3) + 4, 18);
+
+      // Ball
+      const bx = toCanvasX(pos);
+      const by = toCanvasY(f(pos));
+      ctx.beginPath();
+      ctx.arc(bx, by, 10, 0, Math.PI * 2);
+      ctx.fillStyle = '#ff9f43';
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Gradient arrow
+      const grad = df(pos);
+      const arrowLen = Math.min(Math.abs(grad) * 20, 80);
+      const dir = -Math.sign(grad); // we go opposite to gradient
+      ctx.beginPath();
+      ctx.strokeStyle = '#ff6b6b';
+      ctx.lineWidth = 2;
+      ctx.moveTo(bx, by);
+      ctx.lineTo(bx + dir * arrowLen, by);
+      ctx.stroke();
+
+      // Update info
+      posEl.textContent = pos.toFixed(4);
+      lossEl.textContent = f(pos).toFixed(4);
+      stepsEl.textContent = steps;
+    }
+
+    function step() {
+      const lr = getLR();
+      const grad = df(pos);
+      pos = pos - lr * grad;
+      steps++;
+      draw();
+    }
+
+    function runLoop() {
+      if (!running) return;
+      if (Math.abs(df(pos)) < 0.0001 || steps > 1000) {
+        running = false;
+        document.getElementById('btn-run').textContent = '▶ Run';
+        return;
+      }
+      step();
+      animId = setTimeout(runLoop, 60);
+    }
+
+    lrSlider.addEventListener('input', () => {
+      lrVal.textContent = parseFloat(lrSlider.value).toFixed(2);
+    });
+
+    document.getElementById('btn-step').addEventListener('click', () => {
+      if (!running) step();
+    });
+
+    document.getElementById('btn-run').addEventListener('click', () => {
+      running = !running;
+      document.getElementById('btn-run').textContent = running ? '⏸ Pause' : '▶ Run';
+      if (running) runLoop();
+      else clearTimeout(animId);
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', () => {
+      running = false;
+      clearTimeout(animId);
+      document.getElementById('btn-run').textContent = '▶ Run';
+      pos = -2;
+      steps = 0;
+      draw();
+    });
+
+    draw();
+  </script>
+</body>
+</html>

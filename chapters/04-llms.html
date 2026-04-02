@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base href="/learn-llms/">
+  <title>Language Models & LLMs — Learn Neural Networks & LLMs</title>
+  <meta name="description" content="What is a language model? From next-token prediction to GPT-4: tokenization, scaling laws, and context windows explained.">
+  <meta name="theme-color" content="#6c63ff">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="progress-bar"></div>
+
+  <header>
+    <div class="site-title">
+      <span class="logo">🧠</span>
+      <a href="index.html" style="color:inherit;text-decoration:none;">Learn Neural Networks &amp; LLMs</a>
+    </div>
+    <div class="header-nav">
+      <a href="index.html">← All Chapters</a>
+      <button id="theme-toggle" aria-label="Toggle theme">☀️ Light</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="chapter-container">
+
+      <div class="chapter-meta">
+        <span class="chap-num">Chapter 4 of 6</span>
+      </div>
+
+      <h1>💬 Language Models & LLMs</h1>
+      <p class="chapter-intro">
+        A language model is a system that assigns probabilities to text. From that simple idea
+        — predict what comes next — emerges GPT-4, Claude, Gemini, and everything in between.
+      </p>
+
+      <h2>The Core Task: Next-Token Prediction</h2>
+      <div class="callout">
+        <strong>Key idea:</strong> Given everything you've read so far, what word comes next?
+        A language model does exactly this — but with overwhelming scale.
+      </div>
+
+      <p>That's literally it. The entire training objective is:</p>
+      <pre><code><span class="code-comment"># Given tokens [t1, t2, t3, ...], predict t_next</span>
+P(t_next | t1, t2, t3, ...)</code></pre>
+
+      <p>Train on enough text — trillions of tokens from the web, books, code — and something
+        remarkable happens: the model doesn't just learn to predict words. It learns facts,
+        reasoning patterns, languages, coding skills, and more.</p>
+
+      <h2>A Brief History</h2>
+      <p><strong>N-gram models (pre-2010):</strong> Count how often word sequences appear.
+        "The cat sat on the ___" → look up what word most commonly follows in your corpus.
+        Fast, simple, but can't capture long-range context.</p>
+
+      <p><strong>RNN language models (2013–2017):</strong> Process tokens one at a time,
+        maintaining a hidden state. Better at long sequences, but still struggle with
+        very long-range dependencies.</p>
+
+      <p><strong>Transformer LLMs (2017–present):</strong> Attention over all tokens
+        simultaneously. Scale up the architecture and data, and you get GPT, BERT, Claude, etc.</p>
+
+      <h2>Tokenization</h2>
+      <p>LLMs don't read raw text — they read <em>tokens</em>. A token is roughly a word
+        or word-piece. The tokenizer converts text to a sequence of integer IDs.</p>
+
+      <pre><code><span class="code-comment"># Example: GPT-2 tokenizer</span>
+<span class="code-kw">from</span> transformers <span class="code-kw">import</span> GPT2Tokenizer
+
+tokenizer = GPT2Tokenizer.from_pretrained(<span class="code-str">"gpt2"</span>)
+text = <span class="code-str">"Hello, neural networks!"</span>
+tokens = tokenizer.encode(text)
+<span class="code-comment"># → [15496, 11, 17019, 7127, 0]</span>
+<span class="code-comment"># → ["Hello", ",", " neural", " networks", "!"]</span></code></pre>
+
+      <p>Why not just use words? Because tokens let the vocabulary handle:</p>
+      <ul>
+        <li>Unknown words (split into sub-pieces: "unbelievable" → "un", "believ", "able")</li>
+        <li>Multiple languages in one vocabulary</li>
+        <li>Code with unusual identifiers</li>
+      </ul>
+
+      <h2>Context Window</h2>
+      <p>Every LLM has a <strong>context window</strong> — the maximum number of tokens it can
+        "see" at once. This is the model's working memory:</p>
+      <ul>
+        <li>GPT-2: 1,024 tokens (~750 words)</li>
+        <li>GPT-3: 2,048 tokens</li>
+        <li>GPT-4: up to 128,000 tokens</li>
+        <li>Claude 3.5: up to 200,000 tokens (~150,000 words — a full novel)</li>
+      </ul>
+      <p>Beyond the context window, the model has no memory. This is why long conversations
+        sometimes require techniques like summarization or retrieval.</p>
+
+      <h2>Scaling Laws</h2>
+      <div class="callout">
+        <strong>Kaplan et al. (2020):</strong> Model performance improves predictably with
+        more parameters, more data, and more compute — following smooth power laws.
+        Bigger models trained on more data almost always perform better.
+      </div>
+
+      <p>This is why the field moved from millions to billions to trillions of parameters.
+        Scale alone produced capabilities no one explicitly programmed: translation, reasoning,
+        coding, math — all emerging from "just" predicting the next token.</p>
+
+      <h2>🎮 Interactive Demo: Tokenizer Visualizer</h2>
+      <p>Type any text and see how it gets split into tokens. Each token gets a distinct
+        color and its ID shown below.</p>
+
+      <div class="demo-box">
+        <textarea id="token-input" rows="3" style="width:100%;padding:0.75rem;background:var(--code-bg);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:1rem;font-family:system-ui;resize:vertical;" placeholder="Type something here...">The quick brown fox jumps over the lazy dog.</textarea>
+        <div style="margin:0.75rem 0;color:var(--text2);font-size:0.9rem;">
+          Token count: <strong id="token-count">0</strong>
+        </div>
+        <div id="token-display" style="display:flex;flex-wrap:wrap;gap:4px;line-height:2;font-family:monospace;font-size:0.9rem;"></div>
+        <div id="token-ids" style="margin-top:0.75rem;color:var(--text2);font-size:0.8rem;word-break:break-all;"></div>
+      </div>
+
+      <nav class="prev-next">
+        <a href="chapters/03-training.html" class="prev-btn">← Chapter 3: Training</a>
+        <a href="chapters/05-attention.html" class="next-btn">Chapter 5: Attention →</a>
+      </nav>
+
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+  <script>
+    // Simple illustrative tokenizer (whitespace + punctuation splitting)
+    const COLORS = [
+      'rgba(108,99,255,0.25)', 'rgba(78,204,163,0.25)',
+      'rgba(255,159,67,0.25)', 'rgba(255,107,107,0.25)',
+      'rgba(72,219,251,0.25)', 'rgba(255,218,121,0.25)'
+    ];
+    const BORDER_COLORS = [
+      '#6c63ff', '#4ecca3', '#ff9f43', '#ff6b6b', '#48dbfb', '#ffd879'
+    ];
+
+    function simpleTokenize(text) {
+      // Split on whitespace and common punctuation, keep delimiters
+      const raw = text.split(/(\s+|[.,!?;:'"()\[\]{}<>\/\\|@#$%^&*=+~`-])/);
+      return raw.filter(t => t.length > 0);
+    }
+
+    function fakeId(token) {
+      // Deterministic fake token ID based on string hash
+      let h = 0;
+      for (let i = 0; i < token.length; i++) {
+        h = (h * 31 + token.charCodeAt(i)) & 0xffff;
+      }
+      return h;
+    }
+
+    function updateTokens() {
+      const text = document.getElementById('token-input').value;
+      const tokens = simpleTokenize(text);
+      const display = document.getElementById('token-display');
+      const idsEl = document.getElementById('token-ids');
+      const countEl = document.getElementById('token-count');
+
+      display.innerHTML = '';
+      const ids = [];
+
+      tokens.forEach((tok, i) => {
+        if (tok.trim() === '') {
+          // Whitespace token — show as space indicator
+          const sp = document.createElement('span');
+          sp.textContent = '·';
+          sp.style.cssText = 'color:var(--text2);padding:2px 4px;';
+          display.appendChild(sp);
+          ids.push(fakeId(tok));
+          return;
+        }
+        const ci = i % COLORS.length;
+        const span = document.createElement('span');
+        span.textContent = tok;
+        span.title = `Token ID: ${fakeId(tok)}`;
+        span.style.cssText = `
+          background:${COLORS[ci]};
+          border:1px solid ${BORDER_COLORS[ci]};
+          border-radius:4px;
+          padding:2px 6px;
+          cursor:default;
+        `;
+        display.appendChild(span);
+        ids.push(fakeId(tok));
+      });
+
+      const nonWs = tokens.filter(t => t.trim().length > 0);
+      countEl.textContent = nonWs.length;
+      idsEl.textContent = 'IDs: [' + ids.slice(0, 20).join(', ') + (ids.length > 20 ? ', ...' : '') + ']';
+    }
+
+    document.getElementById('token-input').addEventListener('input', updateTokens);
+    updateTokens();
+  </script>
+</body>
+</html>

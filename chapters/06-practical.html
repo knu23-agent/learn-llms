@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base href="/learn-llms/">
+  <title>Practical Examples — Learn Neural Networks & LLMs</title>
+  <meta name="description" content="Real Python code for text generation, sentiment analysis, embeddings, and fine-tuning with Hugging Face Transformers.">
+  <meta name="theme-color" content="#6c63ff">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="progress-bar"></div>
+
+  <header>
+    <div class="site-title">
+      <span class="logo">🧠</span>
+      <a href="index.html" style="color:inherit;text-decoration:none;">Learn Neural Networks &amp; LLMs</a>
+    </div>
+    <div class="header-nav">
+      <a href="index.html">← All Chapters</a>
+      <button id="theme-toggle" aria-label="Toggle theme">☀️ Light</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="chapter-container">
+
+      <div class="chapter-meta">
+        <span class="chap-num">Chapter 6 of 6</span>
+      </div>
+
+      <h1>🔧 Practical Examples</h1>
+      <p class="chapter-intro">
+        Enough theory — let's write code. These examples use
+        <a href="https://huggingface.co/docs/transformers" target="_blank" rel="noopener">Hugging Face Transformers</a>,
+        the go-to library for working with LLMs in Python.
+      </p>
+
+      <div class="callout">
+        <strong>Setup:</strong> Install the required libraries first:
+        <pre style="margin:0.5rem 0 0;"><code>pip install transformers torch</code></pre>
+      </div>
+
+      <h2>1. Text Generation with GPT-2</h2>
+      <p>The <code>pipeline</code> API is the fastest way to use a model. This loads GPT-2
+        and generates text from a prompt:</p>
+
+      <div class="code-block-wrap">
+        <button class="copy-btn" aria-label="Copy code">Copy</button>
+        <pre><code><span class="code-kw">from</span> transformers <span class="code-kw">import</span> pipeline
+
+<span class="code-comment"># Download and load the model (first run downloads ~500MB)</span>
+generator = pipeline(<span class="code-str">"text-generation"</span>, model=<span class="code-str">"gpt2"</span>)
+
+result = generator(
+    <span class="code-str">"Once upon a time, a neural network"</span>,
+    max_new_tokens=<span class="code-num">60</span>,
+    num_return_sequences=<span class="code-num">1</span>,
+    temperature=<span class="code-num">0.8</span>,   <span class="code-comment"># higher = more creative</span>
+    do_sample=<span class="code-kw">True</span>,
+)
+
+print(result[<span class="code-num">0</span>][<span class="code-str">"generated_text"</span>])</code></pre>
+      </div>
+
+      <p>Key parameters:</p>
+      <ul>
+        <li><code>max_new_tokens</code> — how many tokens to generate</li>
+        <li><code>temperature</code> — controls randomness. 0 = deterministic, 1 = standard, &gt;1 = chaotic</li>
+        <li><code>do_sample=True</code> — sample from the distribution instead of always picking the top token</li>
+      </ul>
+
+      <h2>2. Sentiment Analysis</h2>
+      <p>Classification pipelines are even simpler. This uses a model fine-tuned on reviews:</p>
+
+      <div class="code-block-wrap">
+        <button class="copy-btn" aria-label="Copy code">Copy</button>
+        <pre><code><span class="code-kw">from</span> transformers <span class="code-kw">import</span> pipeline
+
+classifier = pipeline(<span class="code-str">"sentiment-analysis"</span>)
+
+results = classifier([
+    <span class="code-str">"I love learning about neural networks!"</span>,
+    <span class="code-str">"This is incredibly confusing and frustrating."</span>,
+    <span class="code-str">"The model performs reasonably well overall."</span>,
+])
+
+<span class="code-kw">for</span> text, result <span class="code-kw">in</span> zip([<span class="code-str">"..."</span>]*<span class="code-num">3</span>, results):
+    print(<span class="code-fn">f</span><span class="code-str">"{result['label']}: {result['score']:.2%}"</span>)
+
+<span class="code-comment"># Output:
+# POSITIVE: 99.9%
+# NEGATIVE: 99.7%
+# POSITIVE: 97.3%</span></code></pre>
+      </div>
+
+      <h2>3. Word Embeddings with BERT</h2>
+      <p>Embeddings are dense vector representations of text. BERT produces contextual
+        embeddings — the same word gets a different vector depending on context:</p>
+
+      <div class="code-block-wrap">
+        <button class="copy-btn" aria-label="Copy code">Copy</button>
+        <pre><code><span class="code-kw">from</span> transformers <span class="code-kw">import</span> AutoTokenizer, AutoModel
+<span class="code-kw">import</span> torch
+
+tokenizer = AutoTokenizer.from_pretrained(<span class="code-str">"bert-base-uncased"</span>)
+model = AutoModel.from_pretrained(<span class="code-str">"bert-base-uncased"</span>)
+
+text = <span class="code-str">"Neural networks are fascinating."</span>
+inputs = tokenizer(text, return_tensors=<span class="code-str">"pt"</span>)
+
+<span class="code-kw">with</span> torch.no_grad():
+    outputs = model(**inputs)
+
+<span class="code-comment"># last_hidden_state shape: [1, seq_len, 768]
+# Each token → 768-dimensional vector</span>
+embeddings = outputs.last_hidden_state
+print(embeddings.shape)
+
+<span class="code-comment"># Sentence embedding: mean-pool all token vectors</span>
+sentence_embedding = embeddings.mean(dim=<span class="code-num">1</span>)  <span class="code-comment"># [1, 768]</span>
+print(sentence_embedding.shape)</code></pre>
+      </div>
+
+      <p>Embeddings are useful for:</p>
+      <ul>
+        <li><strong>Semantic search</strong> — find similar documents by comparing vectors</li>
+        <li><strong>Clustering</strong> — group similar texts</li>
+        <li><strong>Feature input</strong> — feed into downstream classifiers</li>
+      </ul>
+
+      <h2>4. Fine-Tuning a Classifier</h2>
+      <p>Pre-trained models can be fine-tuned on your specific task with relatively little data.
+        Here's a minimal fine-tuning loop:</p>
+
+      <div class="code-block-wrap">
+        <button class="copy-btn" aria-label="Copy code">Copy</button>
+        <pre><code><span class="code-kw">from</span> transformers <span class="code-kw">import</span> (
+    AutoModelForSequenceClassification,
+    AutoTokenizer,
+    Trainer,
+    TrainingArguments,
+)
+<span class="code-kw">from</span> datasets <span class="code-kw">import</span> load_dataset
+
+<span class="code-comment"># Load a pre-trained model with a classification head</span>
+model_name = <span class="code-str">"bert-base-uncased"</span>
+model = AutoModelForSequenceClassification.from_pretrained(
+    model_name, num_labels=<span class="code-num">2</span>  <span class="code-comment"># positive / negative</span>
+)
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+<span class="code-comment"># Load and tokenize a dataset</span>
+dataset = load_dataset(<span class="code-str">"imdb"</span>)
+<span class="code-kw">def</span> <span class="code-fn">tokenize</span>(batch):
+    <span class="code-kw">return</span> tokenizer(batch[<span class="code-str">"text"</span>], truncation=<span class="code-kw">True</span>, padding=<span class="code-str">"max_length"</span>)
+
+dataset = dataset.map(tokenize, batched=<span class="code-kw">True</span>)
+
+<span class="code-comment"># Training configuration</span>
+args = TrainingArguments(
+    output_dir=<span class="code-str">"./results"</span>,
+    num_train_epochs=<span class="code-num">3</span>,
+    per_device_train_batch_size=<span class="code-num">16</span>,
+    evaluation_strategy=<span class="code-str">"epoch"</span>,
+    save_strategy=<span class="code-str">"epoch"</span>,
+    load_best_model_at_end=<span class="code-kw">True</span>,
+)
+
+trainer = Trainer(
+    model=model,
+    args=args,
+    train_dataset=dataset[<span class="code-str">"train"</span>].shuffle(seed=<span class="code-num">42</span>).select(range(<span class="code-num">2000</span>)),
+    eval_dataset=dataset[<span class="code-str">"test"</span>].select(range(<span class="code-num">500</span>)),
+)
+
+trainer.train()
+<span class="code-comment"># Model is now fine-tuned on movie review sentiment</span></code></pre>
+      </div>
+
+      <h2>Further Reading</h2>
+      <p>You've covered the fundamentals. Here's where to go next:</p>
+
+      <div class="further-reading">
+        <a href="https://karpathy.ai/zero-to-hero.html" target="_blank" rel="noopener" class="reading-card">
+          <div class="reading-icon">▶️</div>
+          <div>
+            <strong>Neural Networks: Zero to Hero</strong>
+            <p>Andrej Karpathy builds everything from scratch in Python — the best deep-dive that exists.</p>
+          </div>
+        </a>
+        <a href="https://jalammar.github.io/illustrated-transformer/" target="_blank" rel="noopener" class="reading-card">
+          <div class="reading-icon">🖼️</div>
+          <div>
+            <strong>The Illustrated Transformer</strong>
+            <p>Jay Alammar's visual walkthrough of the Transformer architecture is unmatched for clarity.</p>
+          </div>
+        </a>
+        <a href="https://huggingface.co/learn/nlp-course" target="_blank" rel="noopener" class="reading-card">
+          <div class="reading-icon">🤗</div>
+          <div>
+            <strong>Hugging Face NLP Course</strong>
+            <p>Free, comprehensive course covering Transformers, fine-tuning, and deployment end-to-end.</p>
+          </div>
+        </a>
+        <a href="https://www.youtube.com/playlist?list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi" target="_blank" rel="noopener" class="reading-card">
+          <div class="reading-icon">🎬</div>
+          <div>
+            <strong>3Blue1Brown: Neural Networks</strong>
+            <p>Beautifully animated explanations of how neural networks work, from first principles.</p>
+          </div>
+        </a>
+      </div>
+
+      <nav class="prev-next">
+        <a href="chapters/05-attention.html" class="prev-btn">← Chapter 5: Attention</a>
+        <a href="index.html" class="next-btn">Back to Start 🏠</a>
+      </nav>
+
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "name": "Learn Neural Networks & LLMs",
+  "short_name": "LearnLLMs",
+  "description": "From a single neuron to GPT-4, explained clearly with interactive demos.",
+  "start_url": "/learn-llms/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#6c63ff",
+  "background_color": "#0f0f1a",
+  "icons": [
+    {
+      "src": "assets/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education"],
+  "lang": "en-US"
+}

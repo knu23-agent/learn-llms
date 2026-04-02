@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base href="/learn-llms/">
+  <title>Neural Networks — Learn Neural Networks & LLMs</title>
+  <meta name="description" content="Learn how layers of neurons form a neural network. Understand the forward pass with an interactive animated visualization.">
+  <meta name="theme-color" content="#6c63ff">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="progress-bar"></div>
+
+  <header>
+    <div class="site-title">
+      <span class="logo">🧠</span>
+      <a href="index.html" style="color:inherit;text-decoration:none;">Learn Neural Networks &amp; LLMs</a>
+    </div>
+    <div class="header-nav">
+      <a href="index.html">← All Chapters</a>
+      <button id="theme-toggle" aria-label="Toggle theme">☀️ Light</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="chapter-container">
+
+      <div class="chapter-meta">
+        <span class="chap-num">Chapter 2 of 6</span>
+      </div>
+
+      <h1>🕸️ Neural Networks</h1>
+      <p class="chapter-intro">
+        A neural network is just many neurons organized into layers.
+        Data flows forward through each layer — transformed at every step — until it reaches the output.
+      </p>
+
+      <h2>Layers: The Core Structure</h2>
+      <p>
+        Every neural network has at least three kinds of layers:
+      </p>
+      <ul>
+        <li><strong>Input Layer</strong> — Raw data enters here. Each node is one feature (e.g., a pixel value).</li>
+        <li><strong>Hidden Layer(s)</strong> — Where the magic happens. Neurons learn to detect patterns.
+          Deep networks have many hidden layers — that's why they're called "deep" learning.</li>
+        <li><strong>Output Layer</strong> — The prediction. For classification, each output neuron
+          corresponds to a class. For regression, one neuron outputs a number.</li>
+      </ul>
+
+      <div class="callout">
+        <span class="callout-icon">💡</span>
+        <strong>Why "Deep" Learning?</strong>
+        <p>The depth refers to the number of layers. A shallow network might have 1-2 hidden layers.
+        A deep network can have dozens or hundreds. GPT-4 has 96 layers!</p>
+      </div>
+
+      <h2>The Forward Pass</h2>
+      <p>
+        The <strong>forward pass</strong> is how data moves through the network to produce a prediction.
+        At each layer, every neuron:
+      </p>
+      <ol>
+        <li>Receives outputs from <em>all</em> neurons in the previous layer</li>
+        <li>Computes the weighted sum + bias: <code>z = Wx + b</code></li>
+        <li>Applies activation: <code>a = activation(z)</code></li>
+        <li>Passes its output <code>a</code> to all neurons in the next layer</li>
+      </ol>
+
+      <div class="math-block">
+        Layer output: <strong>a⁽ˡ⁾ = activation(W⁽ˡ⁾ · a⁽ˡ⁻¹⁾ + b⁽ˡ⁾)</strong>
+      </div>
+
+      <p>
+        In matrix form, this is incredibly efficient — one matrix multiplication handles
+        all the neurons in a layer simultaneously. This is why GPUs are essential: they're
+        optimized for parallel matrix operations.
+      </p>
+
+      <h3>Fully Connected (Dense) Layers</h3>
+      <p>
+        In a <em>fully connected</em> layer, every neuron connects to every neuron in the
+        next layer. This is the most basic type. Each connection has its own weight.
+        A 3-neuron layer connecting to a 4-neuron layer has 3 × 4 = 12 weight parameters.
+      </p>
+
+      <div class="callout orange">
+        <span class="callout-icon">🔢</span>
+        <strong>Parameters = the network's "memory"</strong>
+        <p>When people say GPT-3 has "175 billion parameters," they mean 175 billion weights and biases
+        that were learned from data. More parameters → more capacity to learn complex patterns.</p>
+      </div>
+
+      <h2>A Simple Network in Code</h2>
+      <pre><code><span class="kw">import</span> numpy <span class="kw">as</span> np
+
+<span class="cm"># Simple 2-layer neural network (numpy, no frameworks)</span>
+<span class="kw">def</span> <span class="fn">sigmoid</span>(z):
+    <span class="kw">return</span> <span class="num">1</span> / (<span class="num">1</span> + np.exp(-z))
+
+<span class="cm"># Initialize weights randomly</span>
+np.random.seed(<span class="num">42</span>)
+W1 = np.random.randn(<span class="num">3</span>, <span class="num">2</span>)  <span class="cm"># 3 hidden neurons, 2 inputs</span>
+b1 = np.zeros((<span class="num">3</span>, <span class="num">1</span>))
+W2 = np.random.randn(<span class="num">1</span>, <span class="num">3</span>)  <span class="cm"># 1 output neuron, 3 hidden</span>
+b2 = np.zeros((<span class="num">1</span>, <span class="num">1</span>))
+
+<span class="kw">def</span> <span class="fn">forward</span>(x):
+    <span class="cm"># Hidden layer</span>
+    z1 = W1 @ x + b1
+    a1 = sigmoid(z1)
+    <span class="cm"># Output layer</span>
+    z2 = W2 @ a1 + b2
+    a2 = sigmoid(z2)
+    <span class="kw">return</span> a2, a1
+
+<span class="cm"># Run with input [1.0, 0.5]</span>
+x = np.array([[<span class="num">1.0</span>], [<span class="num">0.5</span>]])
+output, hidden = <span class="fn">forward</span>(x)
+<span class="builtin">print</span>(<span class="str">f"Output: {output[0,0]:.4f}"</span>)</code></pre>
+
+      <!-- ── Interactive Demo ── -->
+      <div class="demo-box">
+        <h3>Animated Forward Pass</h3>
+        <p style="color:var(--text2);font-size:0.9rem;margin-bottom:1rem;">
+          A 2→3→1 network. Click "Run Forward Pass" to animate data flowing through.
+          Each node shows its activation value.
+        </p>
+        <canvas id="network-canvas" class="demo-canvas" width="600" height="320"></canvas>
+        <div class="btn-group">
+          <button class="btn" id="run-forward">▶ Run Forward Pass</button>
+          <button class="btn secondary" id="reset-network">↺ Reset</button>
+        </div>
+        <div class="result-display" style="margin-top:1rem;">
+          <div class="result-row">
+            <span class="result-label">Network output</span>
+            <span class="result-val" id="net-output">—</span>
+          </div>
+          <div class="result-row">
+            <span class="result-label">Status</span>
+            <span class="result-val" id="net-status" style="color:var(--text2);font-size:0.85rem;">Click Run to start</span>
+          </div>
+        </div>
+      </div>
+
+      <h2>Universal Approximation</h2>
+      <p>
+        Here's a mind-blowing fact: a neural network with even <em>one</em> hidden layer
+        (given enough neurons) can approximate <strong>any continuous function</strong>.
+        This is the <strong>Universal Approximation Theorem</strong>.
+      </p>
+      <p>
+        In practice, deeper networks (more layers) are more parameter-efficient than
+        wider networks (more neurons per layer). That's why deep learning took off —
+        depth gives you expressive power without needing exponentially more neurons.
+      </p>
+
+      <div class="callout green">
+        <span class="callout-icon">✅</span>
+        <strong>Key Takeaways:</strong>
+        <ul>
+          <li>Neural networks = layers of neurons stacked together</li>
+          <li>Data flows forward: input → hidden layers → output</li>
+          <li>Each layer transforms the data using weights, biases, and activation</li>
+          <li>In matrix form: a = activation(Wx + b)</li>
+          <li>More layers = more abstract features learned</li>
+        </ul>
+      </div>
+
+      <nav class="chapter-nav">
+        <a href="chapters/01-neurons.html" class="nav-prev">
+          <span class="nav-label">Previous Chapter</span>
+          <span class="nav-title nav-arrow">What is a Neuron?</span>
+        </a>
+        <a href="chapters/03-training.html" class="nav-next">
+          <span class="nav-label">Next Chapter</span>
+          <span class="nav-title nav-arrow">Training</span>
+        </a>
+      </nav>
+
+    </div>
+  </main>
+
+  <footer>
+    <p>Built with ❤️ and pure HTML/CSS/JS &nbsp;·&nbsp; <a href="index.html">All Chapters</a></p>
+  </footer>
+
+  <script src="app.js"></script>
+  <script>
+  (function() {
+    const canvas = document.getElementById('network-canvas');
+    const ctx = canvas.getContext('2d');
+    const runBtn = document.getElementById('run-forward');
+    const resetBtn = document.getElementById('reset-network');
+    const outputEl = document.getElementById('net-output');
+    const statusEl = document.getElementById('net-status');
+
+    // Scale canvas for HiDPI
+    const dpr = window.devicePixelRatio || 1;
+    const W = 600, H = 320;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    ctx.scale(dpr, dpr);
+
+    // Network structure: 2 inputs, 3 hidden, 1 output
+    // Fixed weights for demo
+    const W1 = [[0.5, -0.3], [0.8, 0.6], [-0.4, 0.9]];
+    const b1 = [0.1, -0.2, 0.3];
+    const W2 = [[0.7, -0.5, 0.4]];
+    const b2 = [0.1];
+    const inputs = [1.0, 0.5];
+
+    function sigmoid(z) { return 1 / (1 + Math.exp(-z)); }
+
+    // Layout
+    const layers = [
+      { x: 100, nodes: 2, ys: [100, 220] },
+      { x: 300, nodes: 3, ys: [70, 160, 250] },
+      { x: 500, nodes: 1, ys: [160] }
+    ];
+
+    let activations = [inputs.slice(), null, null];
+    let animStep = -1; // -1=idle, 0=input→h1, 1=h1→output, 2=done
+    let rafId = null;
+    let animT = 0;
+    let particles = [];
+
+    function getColor(isDark) {
+      return isDark ? '#6c63ff' : '#4ecca3';
+    }
+
+    function getTextColor() {
+      return document.documentElement.classList.contains('light') ? '#1a1a2e' : '#e8e8f0';
+    }
+    function getBgColor() {
+      return document.documentElement.classList.contains('light') ? '#f5f5ff' : '#0f0f1a';
+    }
+    function getSurfaceColor() {
+      return document.documentElement.classList.contains('light') ? '#ffffff' : '#1e1e35';
+    }
+    function getBorderColor() {
+      return document.documentElement.classList.contains('light') ? '#d0d0e8' : '#2e2e50';
+    }
+
+    function drawNetwork(highlightLayer) {
+      ctx.clearRect(0, 0, W, H);
+
+      // Draw connections
+      for (let l = 0; l < layers.length - 1; l++) {
+        const src = layers[l], dst = layers[l+1];
+        for (let i = 0; i < src.nodes; i++) {
+          for (let j = 0; j < dst.nodes; j++) {
+            ctx.beginPath();
+            ctx.moveTo(src.x, src.ys[i]);
+            ctx.lineTo(dst.x, dst.ys[j]);
+            const active = highlightLayer === l + 1;
+            ctx.strokeStyle = active ? 'rgba(108,99,255,0.5)' : getBorderColor();
+            ctx.lineWidth = active ? 1.5 : 1;
+            ctx.stroke();
+          }
+        }
+      }
+
+      // Draw particles
+      particles.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#6c63ff';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(108,99,255,0.3)';
+        ctx.fill();
+      });
+
+      // Draw nodes
+      layers.forEach((layer, li) => {
+        layer.ys.forEach((y, ni) => {
+          const act = activations[li] ? activations[li][ni] : null;
+          const isActive = highlightLayer >= li;
+
+          // Node circle
+          ctx.beginPath();
+          ctx.arc(layer.x, y, 24, 0, Math.PI * 2);
+          ctx.fillStyle = getSurfaceColor();
+          ctx.fill();
+          ctx.strokeStyle = isActive && act !== null ? '#6c63ff' : getBorderColor();
+          ctx.lineWidth = isActive && act !== null ? 2.5 : 1.5;
+          ctx.stroke();
+
+          // Activation value
+          ctx.fillStyle = act !== null ? '#6c63ff' : getTextColor();
+          ctx.font = `bold ${act !== null ? 11 : 10}px monospace`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(act !== null ? act.toFixed(2) : (li === 0 ? inputs[ni].toFixed(1) : '?'), layer.x, y);
+        });
+      });
+
+      // Layer labels
+      ctx.fillStyle = getTextColor();
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Input', layers[0].x, 290);
+      ctx.fillText('Hidden', layers[1].x, 290);
+      ctx.fillText('Output', layers[2].x, 290);
+    }
+
+    function computeHidden() {
+      return W1.map((row, i) => sigmoid(row[0]*inputs[0] + row[1]*inputs[1] + b1[i]));
+    }
+    function computeOutput(hidden) {
+      return W2.map((row, i) => sigmoid(row[0]*hidden[0] + row[1]*hidden[1] + row[2]*hidden[2] + b2[i]));
+    }
+
+    function spawnParticles(srcLayer, dstLayer) {
+      particles = [];
+      const src = layers[srcLayer], dst = layers[dstLayer];
+      src.ys.forEach(sy => {
+        dst.ys.forEach(dy => {
+          particles.push({ sx: src.x, sy, ex: dst.x, ey: dy, t: Math.random() * 0.3 });
+        });
+      });
+    }
+
+    let startTime = null;
+    function animateStep(timestamp) {
+      if (!startTime) startTime = timestamp;
+      const elapsed = timestamp - startTime;
+      const duration = 800;
+      animT = Math.min(elapsed / duration, 1);
+
+      // Update particle positions
+      particles.forEach(p => {
+        const t = Math.max(0, Math.min((animT - p.t) / 0.7, 1));
+        p.x = p.sx + (p.ex - p.sx) * t;
+        p.y = p.sy + (p.ey - p.sy) * t;
+      });
+
+      drawNetwork(animStep);
+
+      if (animT < 1) {
+        rafId = requestAnimationFrame(animateStep);
+      } else {
+        particles = [];
+        if (animStep === 0) {
+          activations[1] = computeHidden();
+          statusEl.textContent = 'Hidden layer computed!';
+          animStep = 1;
+          spawnParticles(1, 2);
+          startTime = null;
+          rafId = requestAnimationFrame(animateStep);
+        } else if (animStep === 1) {
+          activations[2] = computeOutput(activations[1]);
+          outputEl.textContent = activations[2][0].toFixed(4);
+          statusEl.textContent = '✓ Forward pass complete!';
+          animStep = 2;
+          drawNetwork(3);
+          runBtn.disabled = false;
+          runBtn.textContent = '▶ Run Again';
+        }
+      }
+    }
+
+    runBtn.addEventListener('click', () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      activations = [inputs.slice(), null, null];
+      particles = [];
+      animStep = 0;
+      startTime = null;
+      runBtn.disabled = true;
+      statusEl.textContent = 'Computing hidden layer...';
+      spawnParticles(0, 1);
+      rafId = requestAnimationFrame(animateStep);
+    });
+
+    resetBtn.addEventListener('click', () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      activations = [inputs.slice(), null, null];
+      particles = [];
+      animStep = -1;
+      outputEl.textContent = '—';
+      statusEl.textContent = 'Click Run to start';
+      runBtn.disabled = false;
+      runBtn.textContent = '▶ Run Forward Pass';
+      drawNetwork(-1);
+    });
+
+    drawNetwork(-1);
+  })();
+  </script>
+</body>
+</html>
