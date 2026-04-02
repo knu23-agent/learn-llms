@@ -21,6 +21,7 @@
   --callout-bg: rgba(108, 99, 255, 0.1);
   --callout-border: #6c63ff;
   --code-bg: #0d0d1a;
+  --code-text: #e8e8f0;
   --code-kw: #c678dd;
   --code-str: #98c379;
   --code-num: #d19a66;
@@ -46,7 +47,14 @@
   --accent2: #5a52e0;
   --accent-dim: rgba(108, 99, 255, 0.1);
   --callout-bg: rgba(108, 99, 255, 0.08);
-  --code-bg: #1e1e2e;
+  /* Light-mode code theme */
+  --code-bg: #f3f3fa;
+  --code-text: #1a1a2e;
+  --code-kw: #7c3aed;
+  --code-str: #16a34a;
+  --code-num: #b45309;
+  --code-fn: #1d4ed8;
+  --code-comment: #6b7280;
   --shadow: 0 4px 24px rgba(0,0,0,0.12);
 }
 
@@ -360,7 +368,7 @@ header {
   margin: 1.5rem 0;
   font-family: 'Courier New', monospace;
   font-size: 1rem;
-  color: var(--green);
+  color: var(--code-text);
   text-align: center;
   overflow-x: auto;
 }
@@ -382,7 +390,7 @@ code {
   font-size: 0.9em;
 }
 pre code {
-  color: var(--text);
+  color: var(--code-text);
   font-size: 0.875rem;
 }
 :not(pre) > code {
@@ -393,13 +401,13 @@ pre code {
   color: var(--accent2);
 }
 
-/* Syntax highlight classes */
-.kw { color: var(--code-kw); }
-.str { color: var(--code-str); }
-.num { color: var(--code-num); }
-.fn { color: var(--code-fn); }
-.cm { color: var(--code-comment); font-style: italic; }
-.builtin { color: #e5c07b; }
+/* Syntax highlight classes (both shorthand and prefixed variants) */
+.kw, .code-kw     { color: var(--code-kw); }
+.str, .code-str   { color: var(--code-str); }
+.num, .code-num   { color: var(--code-num); }
+.fn, .code-fn     { color: var(--code-fn); }
+.cm, .code-comment { color: var(--code-comment); font-style: italic; }
+.builtin           { color: var(--code-fn); }
 
 /* Copy button */
 .copy-btn {
