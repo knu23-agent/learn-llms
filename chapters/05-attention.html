@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base href="/learn-llms/">
+  <title>Attention & Transformers — Learn Neural Networks & LLMs</title>
+  <meta name="description" content="The attention mechanism and Transformer architecture explained clearly — with an interactive attention heatmap demo.">
+  <meta name="theme-color" content="#6c63ff">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="progress-bar"></div>
+
+  <header>
+    <div class="site-title">
+      <span class="logo">🧠</span>
+      <a href="index.html" style="color:inherit;text-decoration:none;">Learn Neural Networks &amp; LLMs</a>
+    </div>
+    <div class="header-nav">
+      <a href="index.html">← All Chapters</a>
+      <button id="theme-toggle" aria-label="Toggle theme">☀️ Light</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="chapter-container">
+
+      <div class="chapter-meta">
+        <span class="chap-num">Chapter 5 of 6</span>
+      </div>
+
+      <h1>👁️ Attention & Transformers</h1>
+      <p class="chapter-intro">
+        The Transformer architecture — introduced in "Attention Is All You Need" (2017) —
+        is the engine behind every modern LLM. Its secret weapon: the attention mechanism.
+      </p>
+
+      <h2>The Problem with RNNs</h2>
+      <p>Before Transformers, the dominant approach was Recurrent Neural Networks (RNNs).
+        They processed text one token at a time, passing a hidden state forward.</p>
+      <div class="callout">
+        <strong>The problem:</strong> By the time an RNN reaches token 500, information from
+        token 1 has been squashed into a tiny vector and mostly forgotten.
+        Long-range dependencies — like resolving "it" in a sentence from 10 lines ago — were hard.
+      </div>
+
+      <h2>Attention: Looking at Everything at Once</h2>
+      <p>Attention solves this by letting every token look directly at every other token,
+        regardless of distance. No sequential processing — all tokens in parallel.</p>
+
+      <h3>The Library Analogy</h3>
+      <p>Imagine you're searching a library:</p>
+      <ul>
+        <li><strong>Query (Q)</strong> — your search query ("books about cats")</li>
+        <li><strong>Keys (K)</strong> — the title/description of each book on the shelf</li>
+        <li><strong>Values (V)</strong> — the actual content of each book</li>
+      </ul>
+      <p>Attention computes how well your query matches each key, then returns a weighted
+        blend of the values — more content from books that matched your query better.</p>
+
+      <h2>The Attention Formula</h2>
+      <pre><code>Attention(Q, K, V) = softmax( Q·Kᵀ / √d_k ) · V</code></pre>
+
+      <p>Breaking it down:</p>
+      <ol>
+        <li><strong>Q·Kᵀ</strong> — dot product between queries and keys. High value = good match.</li>
+        <li><strong>/ √d_k</strong> — scale down to prevent huge values from dominating softmax.</li>
+        <li><strong>softmax(…)</strong> — convert scores to probabilities (sum to 1). These are the "attention weights".</li>
+        <li><strong>· V</strong> — weighted sum of values. The output for each token.</li>
+      </ol>
+
+      <pre><code><span class="code-comment"># Minimal attention in NumPy</span>
+<span class="code-kw">import</span> numpy <span class="code-kw">as</span> np
+
+<span class="code-kw">def</span> <span class="code-fn">attention</span>(Q, K, V):
+    d_k = Q.shape[-<span class="code-num">1</span>]
+    scores = Q @ K.T / np.sqrt(d_k)          <span class="code-comment"># [seq, seq]</span>
+    weights = np.exp(scores) / np.exp(scores).sum(axis=-<span class="code-num">1</span>, keepdims=<span class="code-kw">True</span>)
+    <span class="code-kw">return</span> weights @ V                         <span class="code-comment"># [seq, d_v]</span></code></pre>
+
+      <h2>Multi-Head Attention</h2>
+      <p>Instead of one attention computation, Transformers run attention multiple times
+        in parallel (e.g., 8 or 16 "heads"), each learning different relationship types:</p>
+      <ul>
+        <li>One head might track syntactic relationships (subject → verb)</li>
+        <li>Another might track coreference (pronoun → noun)</li>
+        <li>Another might track positional patterns</li>
+      </ul>
+      <p>All heads' outputs are concatenated and projected.</p>
+
+      <h2>The Transformer Block</h2>
+      <p>One Transformer layer = Multi-Head Self-Attention + Feed-Forward Network, with
+        residual connections and layer normalization around each:</p>
+      <pre><code>x = x + MultiHeadAttention(LayerNorm(x))
+x = x + FeedForward(LayerNorm(x))</code></pre>
+      <p>Stack 12–96 of these layers (GPT-3 has 96), and you have an LLM.</p>
+
+      <h2>🎮 Interactive Demo: Attention Weights</h2>
+      <p>Click a word in the sentence to see how much "attention" it pays to each other word.
+        (These are illustrative weights to show the concept — not from a real model.)</p>
+
+      <div class="demo-box">
+        <div id="sentence-display" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1.5rem;"></div>
+        <div style="margin-bottom:0.5rem;color:var(--text2);font-size:0.9rem;">
+          Attention weights from <strong id="selected-word" style="color:var(--accent)">—</strong> to each word:
+        </div>
+        <div id="attention-bars" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+
+      <nav class="prev-next">
+        <a href="chapters/04-llms.html" class="prev-btn">← Chapter 4: LLMs</a>
+        <a href="chapters/06-practical.html" class="next-btn">Chapter 6: Practical →</a>
+      </nav>
+
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+  <script>
+    const sentence = ["The", "cat", "sat", "on", "the", "mat", "because", "it", "was", "tired"];
+
+    // Pre-computed illustrative attention weights [query_word][key_word]
+    // Each row sums to 1.0
+    const attnWeights = [
+      // The(0)
+      [0.20, 0.30, 0.10, 0.05, 0.10, 0.10, 0.03, 0.04, 0.04, 0.04],
+      // cat(1)
+      [0.25, 0.20, 0.18, 0.05, 0.05, 0.05, 0.04, 0.10, 0.04, 0.04],
+      // sat(2)
+      [0.08, 0.22, 0.20, 0.10, 0.08, 0.10, 0.05, 0.08, 0.05, 0.04],
+      // on(3)
+      [0.05, 0.10, 0.15, 0.20, 0.10, 0.25, 0.05, 0.04, 0.03, 0.03],
+      // the(4)
+      [0.15, 0.10, 0.05, 0.05, 0.20, 0.30, 0.03, 0.04, 0.04, 0.04],
+      // mat(5)
+      [0.05, 0.08, 0.12, 0.15, 0.20, 0.20, 0.06, 0.06, 0.04, 0.04],
+      // because(6)
+      [0.05, 0.10, 0.15, 0.05, 0.05, 0.10, 0.20, 0.15, 0.08, 0.07],
+      // it(7)
+      [0.05, 0.30, 0.10, 0.03, 0.05, 0.05, 0.10, 0.15, 0.10, 0.07],
+      // was(8)
+      [0.04, 0.10, 0.08, 0.04, 0.04, 0.05, 0.08, 0.20, 0.20, 0.17],
+      // tired(9)
+      [0.04, 0.15, 0.08, 0.03, 0.04, 0.05, 0.10, 0.20, 0.15, 0.16],
+    ];
+
+    const sentEl = document.getElementById('sentence-display');
+    const barsEl = document.getElementById('attention-bars');
+    const selEl = document.getElementById('selected-word');
+    let selected = -1;
+
+    // Build word chips
+    sentence.forEach((word, i) => {
+      const chip = document.createElement('span');
+      chip.textContent = word;
+      chip.dataset.idx = i;
+      chip.style.cssText = `
+        padding:6px 12px;background:var(--surface);border:2px solid var(--border);
+        border-radius:20px;cursor:pointer;font-size:1rem;transition:all 0.15s;user-select:none;
+      `;
+      chip.addEventListener('click', () => selectWord(i));
+      chip.addEventListener('mouseenter', () => {
+        if (selected !== i) chip.style.borderColor = 'var(--accent2)';
+      });
+      chip.addEventListener('mouseleave', () => {
+        if (selected !== i) chip.style.borderColor = 'var(--border)';
+      });
+      sentEl.appendChild(chip);
+    });
+
+    function selectWord(idx) {
+      selected = idx;
+      selEl.textContent = sentence[idx];
+
+      // Update chip styles
+      sentEl.querySelectorAll('span').forEach((chip, i) => {
+        chip.style.borderColor = i === idx ? 'var(--accent)' : 'var(--border)';
+        chip.style.background = i === idx ? 'var(--accent-dim)' : 'var(--surface)';
+      });
+
+      // Draw bars
+      barsEl.innerHTML = '';
+      const weights = attnWeights[idx];
+      weights.forEach((w, i) => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:0.75rem;';
+
+        const label = document.createElement('span');
+        label.textContent = sentence[i];
+        label.style.cssText = 'min-width:80px;font-family:monospace;color:var(--text);';
+
+        const barWrap = document.createElement('div');
+        barWrap.style.cssText = 'flex:1;background:var(--surface2);border-radius:4px;height:20px;overflow:hidden;';
+
+        const bar = document.createElement('div');
+        bar.style.cssText = `width:${(w * 100).toFixed(1)}%;height:100%;background:var(--accent);border-radius:4px;transition:width 0.3s;`;
+
+        const pct = document.createElement('span');
+        pct.textContent = (w * 100).toFixed(0) + '%';
+        pct.style.cssText = 'min-width:38px;font-family:monospace;font-size:0.85rem;color:var(--text2);';
+
+        barWrap.appendChild(bar);
+        row.appendChild(label);
+        row.appendChild(barWrap);
+        row.appendChild(pct);
+        barsEl.appendChild(row);
+      });
+    }
+
+    // Select "it" by default to show coreference
+    selectWord(7);
+  </script>
+</body>
+</html>

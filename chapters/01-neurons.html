@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base href="/learn-llms/">
+  <title>What is a Neuron? — Learn Neural Networks & LLMs</title>
+  <meta name="description" content="A neuron is the building block of every neural network. Learn about weights, biases, and activation functions with an interactive demo.">
+  <meta name="theme-color" content="#6c63ff">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="progress-bar"></div>
+
+  <header>
+    <div class="site-title">
+      <span class="logo">🧠</span>
+      <a href="index.html" style="color:inherit;text-decoration:none;">Learn Neural Networks &amp; LLMs</a>
+    </div>
+    <div class="header-nav">
+      <a href="index.html">← All Chapters</a>
+      <button id="theme-toggle" aria-label="Toggle theme">☀️ Light</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="chapter-container">
+
+      <div class="chapter-meta">
+        <span class="chap-num">Chapter 1 of 6</span>
+      </div>
+
+      <h1>⚡ What is a Neuron?</h1>
+      <p class="chapter-intro">
+        The neuron is the fundamental building block of every neural network.
+        Understanding how a single neuron works unlocks everything else.
+      </p>
+
+      <h2>The Weighted Voting Machine</h2>
+      <p>
+        Imagine you're deciding whether to go to a party. You consider several factors:
+        <em>Is it raining?</em> (x₁), <em>Will my friends be there?</em> (x₂).
+        But these factors don't all matter equally — whether your friends will be there
+        probably matters <strong>more</strong> than the rain. So you assign weights to each factor.
+      </p>
+      <p>
+        That's exactly what an artificial neuron does. It's a <strong>weighted voting machine</strong>:
+        it takes multiple inputs, multiplies each by a weight (importance), sums everything up,
+        adds a bias (a default inclination), and then applies an activation function to decide its output.
+      </p>
+
+      <div class="callout">
+        <span class="callout-icon">💡</span>
+        <strong>Key Intuition:</strong>
+        <p>A neuron doesn't just count votes — it <em>weights</em> them. High-weight inputs have more
+        influence on the final decision than low-weight ones. The bias lets the neuron fire even when
+        all inputs are zero.</p>
+      </div>
+
+      <h2>The Math</h2>
+      <p>For a neuron with two inputs x₁ and x₂:</p>
+
+      <div class="math-block">
+        z = w₁·x₁ + w₂·x₂ + b<br>
+        output = activation(z)
+      </div>
+
+      <p>Where:</p>
+      <ul>
+        <li><strong>x₁, x₂</strong> — the input values (your data)</li>
+        <li><strong>w₁, w₂</strong> — the weights (learned during training)</li>
+        <li><strong>b</strong> — the bias (a learnable offset)</li>
+        <li><strong>z</strong> — the weighted sum (pre-activation)</li>
+        <li><strong>activation(z)</strong> — a non-linear function applied to z</li>
+      </ul>
+
+      <h2>Activation Functions</h2>
+      <p>
+        Without an activation function, a neuron is just linear — no matter how many layers you stack,
+        you'd only get a linear transformation. Activation functions introduce <em>non-linearity</em>,
+        which is what gives neural networks their expressive power.
+      </p>
+
+      <h3>Sigmoid σ(z)</h3>
+      <p>
+        Outputs a value between 0 and 1. Great for probabilities.
+        Formula: <code>σ(z) = 1 / (1 + e^(-z))</code>
+      </p>
+
+      <h3>ReLU (Rectified Linear Unit)</h3>
+      <p>
+        The most popular activation in modern networks. Simple: if z &gt; 0, output z. Otherwise, output 0.
+        Formula: <code>ReLU(z) = max(0, z)</code>
+      </p>
+
+      <h3>Tanh</h3>
+      <p>
+        Like sigmoid but centered at 0, outputting values between -1 and 1.
+        Formula: <code>tanh(z) = (e^z - e^(-z)) / (e^z + e^(-z))</code>
+      </p>
+
+      <div class="callout orange">
+        <span class="callout-icon">⚠️</span>
+        <strong>The Dying ReLU Problem:</strong>
+        <p>If a neuron's weighted sum is always negative, ReLU outputs 0 forever — the neuron "dies"
+        and stops learning. Variants like Leaky ReLU or GELU fix this.</p>
+      </div>
+
+      <!-- ── Interactive Demo ── -->
+      <div class="demo-box">
+        <h3>Interactive Neuron Demo</h3>
+        <p style="color:var(--text2);font-size:0.9rem;margin-bottom:1.25rem;">
+          Adjust the weights, bias, and inputs to see how a neuron computes its output in real time.
+        </p>
+
+        <div class="slider-row">
+          <label>w₁</label>
+          <input type="range" id="w1" min="-3" max="3" step="0.1" value="1.0">
+          <span class="slider-val" id="w1-val">1.0</span>
+        </div>
+        <div class="slider-row">
+          <label>w₂</label>
+          <input type="range" id="w2" min="-3" max="3" step="0.1" value="0.5">
+          <span class="slider-val" id="w2-val">0.5</span>
+        </div>
+        <div class="slider-row">
+          <label>bias</label>
+          <input type="range" id="bias" min="-3" max="3" step="0.1" value="0.0">
+          <span class="slider-val" id="bias-val">0.0</span>
+        </div>
+
+        <div style="margin-top:1rem;"></div>
+
+        <div class="input-row">
+          <label>x₁</label>
+          <input type="number" id="x1" value="1.0" step="0.1">
+        </div>
+        <div class="input-row">
+          <label>x₂</label>
+          <input type="number" id="x2" value="0.5" step="0.1">
+        </div>
+
+        <div class="result-display">
+          <div class="result-row">
+            <span class="result-label">z = w₁·x₁ + w₂·x₂ + b</span>
+            <span class="result-val" id="z-out">—</span>
+          </div>
+          <div class="result-row">
+            <span class="result-label">sigmoid(z)</span>
+            <span class="result-val" id="sig-out">—</span>
+          </div>
+          <div class="result-row">
+            <span class="result-label">ReLU(z)</span>
+            <span class="result-val" id="relu-out">—</span>
+          </div>
+          <div class="result-row">
+            <span class="result-label">tanh(z)</span>
+            <span class="result-val" id="tanh-out">—</span>
+          </div>
+        </div>
+      </div>
+
+      <h2>Putting It Together</h2>
+      <p>
+        A single neuron can learn simple patterns — but it's limited. A neuron with sigmoid activation
+        essentially learns a linear decision boundary. To solve complex problems, you need
+        <strong>many neurons organized into layers</strong> — which is exactly what Chapter 2 covers.
+      </p>
+
+      <div class="callout green">
+        <span class="callout-icon">✅</span>
+        <strong>Key Takeaways:</strong>
+        <ul>
+          <li>A neuron computes a weighted sum of inputs plus a bias</li>
+          <li>Weights determine how much each input matters</li>
+          <li>Bias lets a neuron have a "default" lean</li>
+          <li>Activation functions add non-linearity — essential for learning complex patterns</li>
+          <li>ReLU is the most commonly used activation in modern networks</li>
+        </ul>
+      </div>
+
+      <!-- ── Prev/Next Nav ── -->
+      <nav class="chapter-nav">
+        <div></div>
+        <a href="chapters/02-networks.html" class="nav-next">
+          <span class="nav-label">Next Chapter</span>
+          <span class="nav-title nav-arrow">Neural Networks</span>
+        </a>
+      </nav>
+
+    </div>
+  </main>
+
+  <footer>
+    <p>Built with ❤️ and pure HTML/CSS/JS &nbsp;·&nbsp; <a href="index.html">All Chapters</a></p>
+  </footer>
+
+  <script src="app.js"></script>
+  <script>
+    // ── Neuron Demo ──────────────────────────────
+    (function() {
+      const ids = ['w1','w2','bias'];
+      const vals = { w1: 1.0, w2: 0.5, bias: 0.0, x1: 1.0, x2: 0.5 };
+
+      function sigmoid(z) { return 1 / (1 + Math.exp(-z)); }
+      function relu(z) { return Math.max(0, z); }
+      function tanh(z) { return Math.tanh(z); }
+      function fmt(n) { return n.toFixed(4); }
+
+      function compute() {
+        const w1 = parseFloat(document.getElementById('w1').value);
+        const w2 = parseFloat(document.getElementById('w2').value);
+        const b  = parseFloat(document.getElementById('bias').value);
+        const x1 = parseFloat(document.getElementById('x1').value) || 0;
+        const x2 = parseFloat(document.getElementById('x2').value) || 0;
+
+        const z = w1*x1 + w2*x2 + b;
+        document.getElementById('z-out').textContent = fmt(z);
+        document.getElementById('sig-out').textContent = fmt(sigmoid(z));
+        document.getElementById('relu-out').textContent = fmt(relu(z));
+        document.getElementById('tanh-out').textContent = fmt(tanh(z));
+      }
+
+      ids.forEach(id => {
+        const slider = document.getElementById(id);
+        const valEl = document.getElementById(id + '-val');
+        slider.addEventListener('input', () => {
+          valEl.textContent = parseFloat(slider.value).toFixed(1);
+          compute();
+        });
+      });
+
+      ['x1','x2'].forEach(id => {
+        document.getElementById(id).addEventListener('input', compute);
+      });
+
+      compute();
+    })();
+  </script>
+</body>
+</html>
