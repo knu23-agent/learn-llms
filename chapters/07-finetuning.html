@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base href="/learn-llms/">
+  <title>Fine-Tuning LLMs — Learn Neural Networks & LLMs</title>
+  <meta name="description" content="How to fine-tune large language models: full fine-tuning, LoRA, instruction tuning, RLHF, and practical Hugging Face PEFT examples.">
+  <meta name="theme-color" content="#6c63ff">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="progress-bar"></div>
+
+  <header>
+    <div class="site-title">
+      <span class="logo">🧠</span>
+      <a href="index.html" style="color:inherit;text-decoration:none;">Learn Neural Networks &amp; LLMs</a>
+    </div>
+    <div class="header-nav">
+      <a href="index.html">← All Chapters</a>
+      <button id="theme-toggle" aria-label="Toggle theme">☀️ Light</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="chapter-container">
+
+      <div class="chapter-meta">
+        <span class="chap-num">Chapter 7 of 9</span>
+      </div>
+
+      <h1>🎯 Fine-Tuning LLMs</h1>
+      <p class="chapter-intro">
+        Pre-trained LLMs are powerful generalists. Fine-tuning makes them specialists —
+        teaching GPT-style models to follow instructions, adopt a persona, or master a domain.
+        This chapter covers every major approach, from full fine-tuning to efficient adapters.
+      </p>
+
+      <h2>Why Fine-Tune?</h2>
+      <div class="callout">
+        <strong>Pre-training vs Fine-tuning:</strong> A base LLM like LLaMA 3 is trained to
+        <em>predict the next token</em> in raw text. It's not trained to be helpful, to follow
+        instructions, or to refuse harmful requests. Fine-tuning shapes behavior without
+        re-training from scratch.
+      </div>
+
+      <p>Common reasons to fine-tune:</p>
+      <ul>
+        <li><strong>Instruction following</strong> — teach the model to respond to commands</li>
+        <li><strong>Domain adaptation</strong> — medical, legal, coding, customer support</li>
+        <li><strong>Style/tone</strong> — make a model match your brand voice</li>
+        <li><strong>Format alignment</strong> — always output JSON, always cite sources</li>
+        <li><strong>Safety</strong> — reduce harmful outputs for your deployment context</li>
+      </ul>
+
+      <h2>Approach 1: Full Fine-Tuning</h2>
+      <p>Update <em>all</em> model parameters on your dataset. Most powerful, but expensive:</p>
+      <ul>
+        <li>A 7B model needs ~56GB of VRAM just for weights in fp16</li>
+        <li>With optimizer states (Adam), multiply by 4–8×</li>
+        <li>Requires A100/H100 class hardware for any large model</li>
+        <li>Risk of <strong>catastrophic forgetting</strong> — overwriting general knowledge</li>
+      </ul>
+
+      <pre><code><span class="code-comment"># Full fine-tuning with Hugging Face Trainer</span>
+<span class="code-kw">from</span> transformers <span class="code-kw">import</span> AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments
+<span class="code-kw">from</span> datasets <span class="code-kw">import</span> load_dataset
+
+model = AutoModelForCausalLM.from_pretrained(<span class="code-str">"meta-llama/Llama-3.2-1B"</span>)
+tokenizer = AutoTokenizer.from_pretrained(<span class="code-str">"meta-llama/Llama-3.2-1B"</span>)
+
+dataset = load_dataset(<span class="code-str">"your-dataset"</span>)
+
+<span class="code-kw">def</span> <span class="code-fn">tokenize</span>(examples):
+    <span class="code-kw">return</span> tokenizer(examples[<span class="code-str">"text"</span>], truncation=<span class="code-kw">True</span>, max_length=<span class="code-num">512</span>)
+
+tokenized = dataset.map(tokenize, batched=<span class="code-kw">True</span>)
+
+args = TrainingArguments(
+    output_dir=<span class="code-str">"./output"</span>,
+    per_device_train_batch_size=<span class="code-num">4</span>,
+    gradient_accumulation_steps=<span class="code-num">8</span>,   <span class="code-comment"># simulate larger batch</span>
+    num_train_epochs=<span class="code-num">3</span>,
+    learning_rate=<span class="code-num">2e-5</span>,
+    fp16=<span class="code-kw">True</span>,                        <span class="code-comment"># half precision to save VRAM</span>
+    save_strategy=<span class="code-str">"epoch"</span>,
+)
+
+trainer = Trainer(model=model, args=args, train_dataset=tokenized[<span class="code-str">"train"</span>])
+trainer.train()</code></pre>
+
+      <h2>Approach 2: LoRA — Low-Rank Adaptation</h2>
+      <div class="callout">
+        <strong>Key insight:</strong> Instead of modifying all weights, LoRA freezes the original
+        model and injects small trainable "adapter" matrices into each layer.
+        The adapters have far fewer parameters — typically 1–10% of the full model size —
+        so training is fast and cheap.
+      </div>
+
+      <h3>How LoRA works mathematically</h3>
+      <p>Each weight matrix <strong>W</strong> (frozen) gets a parallel low-rank update:</p>
+      <pre><code>W' = W + ΔW = W + (A × B)
+
+Where:
+  W  ∈ R^(d × d)   — original frozen weights
+  A  ∈ R^(d × r)   — trainable (random init)
+  B  ∈ R^(r × d)   — trainable (zero init, so ΔW starts at 0)
+  r  = rank         — typically 4, 8, 16, or 64</code></pre>
+
+      <p>The rank <code>r</code> is the key hyperparameter. Higher rank = more capacity = more VRAM.</p>
+
+      <pre><code><span class="code-comment"># LoRA fine-tuning with PEFT + bitsandbytes (4-bit quantization)</span>
+<span class="code-comment"># pip install peft bitsandbytes transformers accelerate datasets</span>
+
+<span class="code-kw">from</span> transformers <span class="code-kw">import</span> AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+<span class="code-kw">from</span> peft <span class="code-kw">import</span> LoraConfig, get_peft_model, TaskType
+<span class="code-kw">import</span> torch
+
+<span class="code-comment"># Load model in 4-bit (QLoRA) — runs on consumer GPU</span>
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=<span class="code-kw">True</span>,
+    bnb_4bit_quant_type=<span class="code-str">"nf4"</span>,
+    bnb_4bit_use_double_quant=<span class="code-kw">True</span>,
+    bnb_4bit_compute_dtype=torch.bfloat16,
+)
+
+model = AutoModelForCausalLM.from_pretrained(
+    <span class="code-str">"meta-llama/Llama-3.2-3B-Instruct"</span>,
+    quantization_config=bnb_config,
+    device_map=<span class="code-str">"auto"</span>,
+)
+tokenizer = AutoTokenizer.from_pretrained(<span class="code-str">"meta-llama/Llama-3.2-3B-Instruct"</span>)
+
+<span class="code-comment"># Attach LoRA adapters</span>
+lora_config = LoraConfig(
+    task_type=TaskType.CAUSAL_LM,
+    r=<span class="code-num">16</span>,                     <span class="code-comment"># rank</span>
+    lora_alpha=<span class="code-num">32</span>,             <span class="code-comment"># scaling factor</span>
+    lora_dropout=<span class="code-num">0.05</span>,
+    target_modules=[<span class="code-str">"q_proj"</span>, <span class="code-str">"v_proj"</span>],  <span class="code-comment"># which layers to adapt</span>
+    bias=<span class="code-str">"none"</span>,
+)
+
+model = get_peft_model(model, lora_config)
+model.print_trainable_parameters()
+<span class="code-comment"># trainable params: 4,194,304 || all params: 3,213,623,296 || trainable%: 0.13%</span></code></pre>
+
+      <h3>QLoRA: Quantize + LoRA</h3>
+      <p>QLoRA (Dettmers et al., 2023) combines 4-bit quantization with LoRA. A 65B model
+        that normally needs 8× A100s can be fine-tuned on a single 48GB GPU. This democratized
+        LLM fine-tuning enormously.</p>
+
+      <h2>Approach 3: Instruction Tuning</h2>
+      <p>Instruction tuning teaches a model to follow natural language commands.
+        The key is <strong>data format</strong> — you need prompt/response pairs:</p>
+
+      <pre><code><span class="code-comment"># Alpaca-style instruction format</span>
+example = {
+    <span class="code-str">"instruction"</span>: <span class="code-str">"Translate the following to French."</span>,
+    <span class="code-str">"input"</span>: <span class="code-str">"The weather is nice today."</span>,
+    <span class="code-str">"output"</span>: <span class="code-str">"Le temps est agréable aujourd'hui."</span>
+}
+
+<span class="code-comment"># Format into a single training string</span>
+<span class="code-kw">def</span> <span class="code-fn">format_prompt</span>(example):
+    <span class="code-kw">return</span> <span class="code-fn">f</span><span class="code-str">"""### Instruction:
+{example['instruction']}
+
+### Input:
+{example['input']}
+
+### Response:
+{example['output']}&lt;/s&gt;"""</span>
+
+<span class="code-comment"># Modern chat format (preferred for chat models)</span>
+messages = [
+    {<span class="code-str">"role"</span>: <span class="code-str">"system"</span>, <span class="code-str">"content"</span>: <span class="code-str">"You are a helpful assistant."</span>},
+    {<span class="code-str">"role"</span>: <span class="code-str">"user"</span>, <span class="code-str">"content"</span>: <span class="code-str">"What is the capital of France?"</span>},
+    {<span class="code-str">"role"</span>: <span class="code-str">"assistant"</span>, <span class="code-str">"content"</span>: <span class="code-str">"The capital of France is Paris."</span>},
+]
+<span class="code-comment"># Apply the tokenizer's chat template</span>
+formatted = tokenizer.apply_chat_template(messages, tokenize=<span class="code-kw">False</span>)</code></pre>
+
+      <p>Good instruction datasets include: <strong>Alpaca</strong>, <strong>FLAN</strong>,
+        <strong>Open Hermes</strong>, <strong>ShareGPT</strong>, and <strong>Dolly</strong>.</p>
+
+      <h2>Approach 4: RLHF (Reinforcement Learning from Human Feedback)</h2>
+      <div class="callout">
+        <strong>This is how ChatGPT, Claude, and Gemini are aligned.</strong>
+        RLHF takes a supervised fine-tuned model and further trains it to produce outputs
+        that humans prefer — using human ratings as a training signal.
+      </div>
+
+      <p>The three-stage pipeline:</p>
+
+      <div class="pipeline-steps">
+        <div class="pipeline-step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Supervised Fine-Tuning (SFT)</strong>
+            <p>Fine-tune the base model on high-quality prompt/response demonstrations.
+               This gives the model a starting point for human-preferred behavior.</p>
+          </div>
+        </div>
+        <div class="pipeline-step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Reward Model Training</strong>
+            <p>Humans compare pairs of responses and pick the better one.
+               A separate "reward model" is trained to predict these preferences —
+               outputting a scalar score for any (prompt, response) pair.</p>
+          </div>
+        </div>
+        <div class="pipeline-step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <strong>PPO / RL Optimization</strong>
+            <p>The SFT model is further trained via Proximal Policy Optimization (PPO)
+               to maximize the reward model's score — while a KL divergence penalty
+               prevents it from drifting too far from the SFT model.</p>
+          </div>
+        </div>
+      </div>
+
+      <h3>DPO: A Simpler Alternative</h3>
+      <p>Direct Preference Optimization (DPO, 2023) skips the reward model entirely.
+        It directly trains the LLM on preference pairs using a re-derived loss function
+        that implicitly encodes the same objective as RLHF, but with standard supervised training:</p>
+
+      <pre><code><span class="code-kw">from</span> trl <span class="code-kw">import</span> DPOTrainer, DPOConfig
+
+<span class="code-comment"># Dataset format: each row has prompt, chosen response, rejected response</span>
+<span class="code-comment"># {</span>
+<span class="code-comment">#   "prompt": "Explain quantum computing.",</span>
+<span class="code-comment">#   "chosen": "Quantum computing uses qubits...",  ← preferred</span>
+<span class="code-comment">#   "rejected": "Quantum computing is complicated." ← not preferred</span>
+<span class="code-comment"># }</span>
+
+dpo_config = DPOConfig(
+    beta=<span class="code-num">0.1</span>,      <span class="code-comment"># KL penalty strength</span>
+    output_dir=<span class="code-str">"./dpo-output"</span>,
+    per_device_train_batch_size=<span class="code-num">2</span>,
+    max_length=<span class="code-num">512</span>,
+)
+
+trainer = DPOTrainer(
+    model=model,
+    args=dpo_config,
+    train_dataset=preference_dataset,
+    tokenizer=tokenizer,
+)
+trainer.train()</code></pre>
+
+      <h2>🎮 Interactive Demo: LoRA Rank Explorer</h2>
+      <p>See how different LoRA ranks affect the number of trainable parameters
+        for a typical model layer. Drag the sliders to explore the tradeoffs.</p>
+
+      <div class="demo-box">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+          <label class="slider-group">
+            Model dim (d):
+            <input type="range" id="dim-slider" min="512" max="8192" step="512" value="4096">
+            <span id="dim-val" style="color:var(--accent)">4096</span>
+          </label>
+          <label class="slider-group">
+            LoRA rank (r):
+            <input type="range" id="rank-slider" min="1" max="128" step="1" value="16">
+            <span id="rank-val" style="color:var(--accent)">16</span>
+          </label>
+          <label class="slider-group">
+            Num layers:
+            <input type="range" id="layers-slider" min="4" max="80" step="4" value="32">
+            <span id="layers-val" style="color:var(--accent)">32</span>
+          </label>
+          <label class="slider-group">
+            Target modules (q+v = 2):
+            <input type="range" id="modules-slider" min="1" max="8" step="1" value="2">
+            <span id="modules-val" style="color:var(--accent)">2</span>
+          </label>
+        </div>
+        <div id="lora-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.75rem;"></div>
+      </div>
+
+      <h2>Choosing the Right Approach</h2>
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Method</th><th>VRAM</th><th>Speed</th><th>Quality</th><th>Best for</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Full FT</strong></td><td>🔴 Very high</td><td>🔴 Slow</td><td>🟢 Best</td>
+            <td>Small models, ample hardware</td>
+          </tr>
+          <tr>
+            <td><strong>LoRA</strong></td><td>🟡 Moderate</td><td>🟢 Fast</td><td>🟢 Near-best</td>
+            <td>Most use cases</td>
+          </tr>
+          <tr>
+            <td><strong>QLoRA</strong></td><td>🟢 Low</td><td>🟡 Moderate</td><td>🟢 Near-best</td>
+            <td>Consumer GPU, large models</td>
+          </tr>
+          <tr>
+            <td><strong>DPO</strong></td><td>🟡 Moderate</td><td>🟢 Fast</td><td>🟢 Good</td>
+            <td>Alignment, preference learning</td>
+          </tr>
+          <tr>
+            <td><strong>RLHF</strong></td><td>🔴 Very high</td><td>🔴 Slow</td><td>🟢 Best (alignment)</td>
+            <td>Production alignment</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <nav class="prev-next">
+        <a href="chapters/06-practical.html" class="prev-btn">← Chapter 6: Practical Examples</a>
+        <a href="chapters/08-evaluation.html" class="next-btn">Chapter 8: Evaluation →</a>
+      </nav>
+
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+  <script>
+    function fmt(n) {
+      if (n >= 1e9) return (n/1e9).toFixed(2) + 'B';
+      if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
+      if (n >= 1e3) return (n/1e3).toFixed(0) + 'K';
+      return n.toString();
+    }
+
+    function update() {
+      const d = parseInt(document.getElementById('dim-slider').value);
+      const r = parseInt(document.getElementById('rank-slider').value);
+      const L = parseInt(document.getElementById('layers-slider').value);
+      const m = parseInt(document.getElementById('modules-slider').value);
+
+      document.getElementById('dim-val').textContent = d;
+      document.getElementById('rank-val').textContent = r;
+      document.getElementById('layers-val').textContent = L;
+      document.getElementById('modules-val').textContent = m;
+
+      const fullParams = d * d * m * L;
+      const loraParams = 2 * d * r * m * L; // A + B matrices per adapter
+      const pct = (loraParams / fullParams * 100).toFixed(3);
+      const ratio = Math.round(fullParams / loraParams);
+
+      const stats = [
+        { label: 'Full layer params', value: fmt(fullParams), color: 'var(--red)' },
+        { label: 'LoRA adapter params', value: fmt(loraParams), color: 'var(--green)' },
+        { label: '% trainable', value: pct + '%', color: 'var(--accent)' },
+        { label: 'Compression ratio', value: ratio + '×', color: 'var(--orange)' },
+      ];
+
+      const el = document.getElementById('lora-stats');
+      el.innerHTML = stats.map(s => `
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem;text-align:center;">
+          <div style="font-size:1.4rem;font-weight:700;color:${s.color};font-family:monospace;">${s.value}</div>
+          <div style="font-size:0.82rem;color:var(--text2);margin-top:0.25rem;">${s.label}</div>
+        </div>
+      `).join('');
+    }
+
+    ['dim-slider','rank-slider','layers-slider','modules-slider'].forEach(id =>
+      document.getElementById(id).addEventListener('input', update)
+    );
+    update();
+  </script>
+</body>
+</html>

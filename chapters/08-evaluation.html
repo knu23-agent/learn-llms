@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base href="/learn-llms/">
+  <title>Evaluating LLMs — Learn Neural Networks & LLMs</title>
+  <meta name="description" content="How to evaluate LLM performance: benchmarks, BLEU/ROUGE, perplexity, LLM-as-judge, human evaluation, and safety testing.">
+  <meta name="theme-color" content="#6c63ff">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="progress-bar"></div>
+
+  <header>
+    <div class="site-title">
+      <span class="logo">🧠</span>
+      <a href="index.html" style="color:inherit;text-decoration:none;">Learn Neural Networks &amp; LLMs</a>
+    </div>
+    <div class="header-nav">
+      <a href="index.html">← All Chapters</a>
+      <button id="theme-toggle" aria-label="Toggle theme">☀️ Light</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="chapter-container">
+
+      <div class="chapter-meta">
+        <span class="chap-num">Chapter 8 of 9</span>
+      </div>
+
+      <h1>📊 Evaluating LLMs</h1>
+      <p class="chapter-intro">
+        "How good is this model?" turns out to be one of the hardest questions in AI.
+        LLMs can write poetry, debug code, and reason about ethics — so how do you measure that?
+        This chapter covers the full toolkit: automated metrics, benchmarks, LLM-as-judge, and human eval.
+      </p>
+
+      <h2>Why Evaluation is Hard</h2>
+      <div class="callout">
+        <strong>The core problem:</strong> For most generation tasks, there's no single correct answer.
+        "Write a poem about autumn" has infinite valid responses. Unlike classification (right/wrong),
+        LLM quality lives on a spectrum — and humans don't always agree either.
+      </div>
+
+      <p>The three main evaluation paradigms:</p>
+      <ol>
+        <li><strong>Automated metrics</strong> — fast, cheap, reproducible. But often miss what matters.</li>
+        <li><strong>Benchmark tasks</strong> — standardized tests with known answers. Gameable.</li>
+        <li><strong>Human / LLM-as-judge evaluation</strong> — more valid, but expensive and slow.</li>
+      </ol>
+
+      <h2>Automated Metrics</h2>
+
+      <h3>Perplexity</h3>
+      <p>Perplexity measures how "surprised" a language model is by a test set.
+        Lower is better — it means the model assigns high probability to the actual text.</p>
+
+      <pre><code><span class="code-comment"># Perplexity = exp(average negative log-likelihood)</span>
+<span class="code-kw">import</span> torch
+<span class="code-kw">from</span> transformers <span class="code-kw">import</span> AutoModelForCausalLM, AutoTokenizer
+
+model = AutoModelForCausalLM.from_pretrained(<span class="code-str">"gpt2"</span>)
+tokenizer = AutoTokenizer.from_pretrained(<span class="code-str">"gpt2"</span>)
+
+text = <span class="code-str">"The cat sat on the mat."</span>
+inputs = tokenizer(text, return_tensors=<span class="code-str">"pt"</span>)
+
+<span class="code-kw">with</span> torch.no_grad():
+    outputs = model(**inputs, labels=inputs[<span class="code-str">"input_ids"</span>])
+
+loss = outputs.loss              <span class="code-comment"># average NLL per token</span>
+perplexity = torch.exp(loss)
+print(<span class="code-fn">f</span><span class="code-str">"Perplexity: {perplexity.item():.2f}"</span>)</code></pre>
+
+      <p><strong>Limitation:</strong> Perplexity only tells you if the model assigns high probability
+        to the test data — not whether it's helpful, accurate, or safe.</p>
+
+      <h3>BLEU Score</h3>
+      <p>Originally designed for machine translation. Compares n-gram overlap between
+        the generated text and one or more reference translations.</p>
+
+      <pre><code><span class="code-kw">from</span> nltk.translate.bleu_score <span class="code-kw">import</span> sentence_bleu
+
+reference = [[<span class="code-str">"the"</span>, <span class="code-str">"cat"</span>, <span class="code-str">"is"</span>, <span class="code-str">"on"</span>, <span class="code-str">"the"</span>, <span class="code-str">"mat"</span>]]
+candidate = [<span class="code-str">"the"</span>, <span class="code-str">"cat"</span>, <span class="code-str">"sits"</span>, <span class="code-str">"on"</span>, <span class="code-str">"the"</span>, <span class="code-str">"mat"</span>]
+
+score = sentence_bleu(reference, candidate)
+print(<span class="code-fn">f</span><span class="code-str">"BLEU: {score:.3f}"</span>)  <span class="code-comment"># 0.0 - 1.0 (higher is better)</span></code></pre>
+
+      <p><strong>Limitation:</strong> BLEU penalizes valid paraphrases. "The feline rests on the rug"
+        scores near zero even if it's an excellent translation.</p>
+
+      <h3>ROUGE</h3>
+      <p>Recall-Oriented Understudy for Gisting Evaluation. Used for summarization.
+        ROUGE-1 measures unigram overlap; ROUGE-L measures longest common subsequence.</p>
+
+      <pre><code><span class="code-kw">from</span> rouge_score <span class="code-kw">import</span> rouge_scorer
+
+scorer = rouge_scorer.RougeScorer([<span class="code-str">'rouge1'</span>, <span class="code-str">'rougeL'</span>], use_stemmer=<span class="code-kw">True</span>)
+reference = <span class="code-str">"The quick brown fox jumps over the lazy dog."</span>
+generated = <span class="code-str">"A fast brown fox leaps over a sleepy dog."</span>
+
+scores = scorer.score(reference, generated)
+print(scores[<span class="code-str">'rouge1'</span>])   <span class="code-comment"># Score(precision, recall, fmeasure)</span></code></pre>
+
+      <h3>BERTScore</h3>
+      <p>Uses BERT embeddings to compare semantic similarity between generated and reference text.
+        Much better at capturing meaning than n-gram overlap.</p>
+
+      <pre><code><span class="code-kw">from</span> bert_score <span class="code-kw">import</span> score
+
+candidates = [<span class="code-str">"The feline rests on the rug."</span>]
+references  = [<span class="code-str">"The cat is on the mat."</span>]
+
+P, R, F1 = score(candidates, references, lang=<span class="code-str">"en"</span>)
+print(<span class="code-fn">f</span><span class="code-str">"BERTScore F1: {F1.mean():.4f}"</span>)  <span class="code-comment"># Much higher than BLEU!</span></code></pre>
+
+      <h2>Standardized Benchmarks</h2>
+      <p>Academic benchmarks give models known problems with known answers — enabling reproducible comparisons:</p>
+
+      <table class="comparison-table">
+        <thead>
+          <tr><th>Benchmark</th><th>Tests</th><th>Format</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>MMLU</strong></td>
+            <td>57 subjects from school to professional exams</td>
+            <td>Multiple choice</td>
+          </tr>
+          <tr>
+            <td><strong>HumanEval</strong></td>
+            <td>Python coding problems, unit-tested</td>
+            <td>Code generation</td>
+          </tr>
+          <tr>
+            <td><strong>GSM8K</strong></td>
+            <td>Grade-school math word problems</td>
+            <td>Chain-of-thought reasoning</td>
+          </tr>
+          <tr>
+            <td><strong>HellaSwag</strong></td>
+            <td>Common-sense sentence completion</td>
+            <td>Multiple choice</td>
+          </tr>
+          <tr>
+            <td><strong>TruthfulQA</strong></td>
+            <td>Questions humans often answer incorrectly</td>
+            <td>True/false + generation</td>
+          </tr>
+          <tr>
+            <td><strong>MT-Bench</strong></td>
+            <td>Multi-turn conversations across 8 categories</td>
+            <td>Open-ended, LLM-judged</td>
+          </tr>
+          <tr>
+            <td><strong>LMSYS Chatbot Arena</strong></td>
+            <td>Head-to-head model battles, human voting</td>
+            <td>Elo rating</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout">
+        <strong>Benchmark contamination:</strong> If training data contains benchmark answers,
+        scores are inflated. Always check whether a model was trained after the benchmark was published.
+        The leaderboard problem: models can be over-optimized for specific benchmarks while
+        remaining poor in real-world use.
+      </div>
+
+      <h2>LLM-as-Judge</h2>
+      <p>Use a strong LLM (like GPT-4 or Claude) to evaluate another model's outputs.
+        Much cheaper than human evaluation, surprisingly correlated with human judgment.</p>
+
+      <pre><code><span class="code-kw">from</span> openai <span class="code-kw">import</span> OpenAI
+
+client = OpenAI()
+
+<span class="code-kw">def</span> <span class="code-fn">llm_judge</span>(question, answer, criteria=<span class="code-str">"helpfulness, accuracy, clarity"</span>):
+    prompt = <span class="code-fn">f</span><span class="code-str">"""You are an expert evaluator. Rate the following answer on a scale of 1-10.
+
+Question: {question}
+
+Answer: {answer}
+
+Evaluate on: {criteria}
+
+Respond with:
+Score: [1-10]
+Reasoning: [brief explanation]"""</span>
+
+    response = client.chat.completions.create(
+        model=<span class="code-str">"gpt-4o"</span>,
+        messages=[{<span class="code-str">"role"</span>: <span class="code-str">"user"</span>, <span class="code-str">"content"</span>: prompt}],
+        temperature=<span class="code-num">0</span>,
+    )
+    <span class="code-kw">return</span> response.choices[<span class="code-num">0</span>].message.content
+
+<span class="code-comment"># Pairwise comparison (A vs B)</span>
+<span class="code-kw">def</span> <span class="code-fn">pairwise_judge</span>(question, answer_a, answer_b):
+    prompt = <span class="code-fn">f</span><span class="code-str">"""Which response is better for this question?
+
+Question: {question}
+Response A: {answer_a}
+Response B: {answer_b}
+
+Reply with: A, B, or Tie. Then explain why."""</span>
+    <span class="code-comment"># ... same API call</span></code></pre>
+
+      <p><strong>Known biases to watch for:</strong></p>
+      <ul>
+        <li><strong>Position bias</strong> — judges favor the first response listed</li>
+        <li><strong>Verbosity bias</strong> — longer answers score higher regardless of quality</li>
+        <li><strong>Self-enhancement bias</strong> — a model may prefer its own style</li>
+      </ul>
+      <p>Mitigate by: randomizing response order, averaging multiple judge runs, using diverse judge models.</p>
+
+      <h2>Human Evaluation</h2>
+      <p>The gold standard — but expensive. Key guidelines:</p>
+      <ul>
+        <li><strong>Define clear rubrics</strong> before collecting ratings</li>
+        <li><strong>Use multiple annotators</strong> and measure inter-annotator agreement (Cohen's κ)</li>
+        <li><strong>Blind evaluators</strong> to which model produced which output</li>
+        <li><strong>Representative prompts</strong> — your eval set should reflect your actual use cases</li>
+        <li><strong>Adversarial prompts</strong> — include edge cases and attempts to elicit bad behavior</li>
+      </ul>
+
+      <h2>Safety Evaluation</h2>
+      <div class="callout">
+        <strong>Alignment isn't free.</strong> Even well-trained models can produce harmful,
+        biased, or factually incorrect outputs. Safety evaluation is now a mandatory part of
+        responsible deployment.
+      </div>
+
+      <p>Key safety dimensions to test:</p>
+      <ul>
+        <li><strong>Refusal rate</strong> — does the model refuse clearly harmful requests?</li>
+        <li><strong>Hallucination rate</strong> — how often does it confidently state falsehoods?</li>
+        <li><strong>Bias</strong> — does it treat demographic groups differently?</li>
+        <li><strong>Jailbreak robustness</strong> — does it maintain safety under adversarial prompts?</li>
+        <li><strong>Toxicity</strong> — does it produce offensive or harmful content unprompted?</li>
+      </ul>
+
+      <pre><code><span class="code-comment"># Simple hallucination detection: ask the model about a known fact,</span>
+<span class="code-comment"># then verify the answer against a ground truth source</span>
+
+questions_with_answers = [
+    (<span class="code-str">"What year was Python created?"</span>, <span class="code-str">"1991"</span>),
+    (<span class="code-str">"Who wrote Pride and Prejudice?"</span>, <span class="code-str">"Jane Austen"</span>),
+    (<span class="code-str">"What is the capital of Australia?"</span>, <span class="code-str">"Canberra"</span>),
+]
+
+correct = <span class="code-num">0</span>
+<span class="code-kw">for</span> question, expected <span class="code-kw">in</span> questions_with_answers:
+    response = query_model(question)
+    <span class="code-kw">if</span> expected.lower() <span class="code-kw">in</span> response.lower():
+        correct += <span class="code-num">1</span>
+
+accuracy = correct / len(questions_with_answers)
+print(<span class="code-fn">f</span><span class="code-str">"Factual accuracy: {accuracy:.1%}"</span>)</code></pre>
+
+      <h2>🎮 Interactive Demo: Metric Calculator</h2>
+      <p>Enter a reference text and a model output, then see how different metrics score them.</p>
+
+      <div class="demo-box">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+          <label style="display:flex;flex-direction:column;gap:0.5rem;">
+            <span style="color:var(--text2);font-size:0.9rem;">Reference text:</span>
+            <textarea id="ref-text" rows="3" style="padding:0.5rem;background:var(--code-bg);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:0.9rem;resize:vertical;">The cat sat on the mat and looked out the window.</textarea>
+          </label>
+          <label style="display:flex;flex-direction:column;gap:0.5rem;">
+            <span style="color:var(--text2);font-size:0.9rem;">Model output:</span>
+            <textarea id="gen-text" rows="3" style="padding:0.5rem;background:var(--code-bg);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:0.9rem;resize:vertical;">A cat was sitting on the mat and stared through the window.</textarea>
+          </label>
+        </div>
+        <button id="calc-btn" class="btn-demo">Calculate Metrics</button>
+        <div id="metric-results" style="margin-top:1rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.75rem;"></div>
+      </div>
+
+      <nav class="prev-next">
+        <a href="chapters/07-finetuning.html" class="prev-btn">← Chapter 7: Fine-Tuning</a>
+        <a href="chapters/09-agents.html" class="next-btn">Chapter 9: Agentic AI →</a>
+      </nav>
+
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+  <script>
+    function tokenize(text) {
+      return text.toLowerCase().replace(/[^a-z0-9\s]/g,'').split(/\s+/).filter(Boolean);
+    }
+
+    function ngramOverlap(ref, gen, n) {
+      function ngrams(tokens, n) {
+        const grams = new Map();
+        for (let i = 0; i <= tokens.length - n; i++) {
+          const g = tokens.slice(i, i+n).join(' ');
+          grams.set(g, (grams.get(g) || 0) + 1);
+        }
+        return grams;
+      }
+      const rg = ngrams(ref, n), gg = ngrams(gen, n);
+      let overlap = 0, total = 0;
+      gg.forEach((cnt, g) => {
+        overlap += Math.min(cnt, rg.get(g) || 0);
+        total += cnt;
+      });
+      return total > 0 ? overlap / total : 0;
+    }
+
+    function rouge1(ref, gen) {
+      const refTok = tokenize(ref), genTok = tokenize(gen);
+      const refSet = new Map();
+      refTok.forEach(w => refSet.set(w, (refSet.get(w)||0)+1));
+      let matches = 0;
+      genTok.forEach(w => {
+        if ((refSet.get(w)||0) > 0) { matches++; refSet.set(w, refSet.get(w)-1); }
+      });
+      const p = genTok.length ? matches/genTok.length : 0;
+      const r = refTok.length ? matches/refTok.length : 0;
+      return p+r ? 2*p*r/(p+r) : 0;
+    }
+
+    function bleu(ref, gen) {
+      const refTok = tokenize(ref), genTok = tokenize(gen);
+      if (!genTok.length) return 0;
+      // BLEU-1 simplified
+      const b1 = ngramOverlap(refTok, genTok, 1);
+      const b2 = ngramOverlap(refTok, genTok, 2);
+      // brevity penalty
+      const bp = genTok.length < refTok.length ? Math.exp(1 - refTok.length/genTok.length) : 1;
+      return bp * Math.sqrt(b1 * (b2 || b1));
+    }
+
+    function exactMatchWords(ref, gen) {
+      const rt = new Set(tokenize(ref)), gt = new Set(tokenize(gen));
+      const inter = [...rt].filter(w => gt.has(w));
+      return rt.size ? inter.length / rt.size : 0;
+    }
+
+    function lengthRatio(ref, gen) {
+      const rl = tokenize(ref).length, gl = tokenize(gen).length;
+      return rl ? Math.min(gl/rl, rl/gl) : 0;
+    }
+
+    document.getElementById('calc-btn').addEventListener('click', () => {
+      const ref = document.getElementById('ref-text').value;
+      const gen = document.getElementById('gen-text').value;
+
+      const metrics = [
+        { name: 'BLEU-2', value: bleu(ref, gen), desc: 'N-gram precision' },
+        { name: 'ROUGE-1 F1', value: rouge1(ref, gen), desc: 'Unigram overlap' },
+        { name: 'Word Overlap', value: exactMatchWords(ref, gen), desc: 'Unique word recall' },
+        { name: 'Length Ratio', value: lengthRatio(ref, gen), desc: 'Length similarity' },
+      ];
+
+      const el = document.getElementById('metric-results');
+      el.innerHTML = metrics.map(m => {
+        const pct = (m.value * 100).toFixed(1);
+        const color = m.value > 0.6 ? 'var(--green)' : m.value > 0.3 ? 'var(--orange)' : 'var(--red)';
+        return `
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem;text-align:center;">
+            <div style="font-size:1.5rem;font-weight:700;color:${color};font-family:monospace;">${pct}%</div>
+            <div style="font-weight:600;margin:0.25rem 0;">${m.name}</div>
+            <div style="font-size:0.8rem;color:var(--text2);">${m.desc}</div>
+          </div>`;
+      }).join('');
+    });
+  </script>
+</body>
+</html>
