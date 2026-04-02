@@ -409,6 +409,21 @@ pre code {
 .cm, .code-comment { color: var(--code-comment); font-style: italic; }
 .builtin           { color: var(--code-fn); }
 
+/* ── Explicit light-mode code overrides (belt + suspenders) ── */
+.light pre,
+.light .math-block {
+  background: #f3f3fa !important;
+  border-color: #d0d0e8 !important;
+}
+.light pre code {
+  color: #1a1a2e !important;
+}
+.light .code-kw, .light .kw     { color: #7c3aed !important; }
+.light .code-str, .light .str   { color: #16a34a !important; }
+.light .code-num, .light .num   { color: #b45309 !important; }
+.light .code-fn,  .light .fn    { color: #1d4ed8 !important; }
+.light .code-comment, .light .cm { color: #6b7280 !important; }
+
 /* Copy button */
 .copy-btn {
   position: absolute;
