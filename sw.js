@@ -3,7 +3,7 @@
    Cache name: learn-llms-v1
    ============================================ */
 
-const CACHE_NAME = 'learn-llms-v1';
+const CACHE_NAME = 'learn-llms-v2';
 const PRECACHE_URLS = [
   '/learn-llms/',
   '/learn-llms/index.html',
@@ -17,6 +17,9 @@ const PRECACHE_URLS = [
   '/learn-llms/chapters/04-llms.html',
   '/learn-llms/chapters/05-attention.html',
   '/learn-llms/chapters/06-practical.html',
+  '/learn-llms/chapters/07-finetuning.html',
+  '/learn-llms/chapters/08-evaluation.html',
+  '/learn-llms/chapters/09-agents.html',
   '/learn-llms/assets/icon-192.svg',
   '/learn-llms/assets/icon-512.svg',
 ];

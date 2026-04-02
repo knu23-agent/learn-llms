@@ -736,6 +736,81 @@ footer a { color: var(--accent2); }
 .links-list .link-sub { font-size: 0.82rem; color: var(--text2); }
 .links-list .link-arrow { color: var(--text2); }
 
+/* ── Pipeline steps ── */
+.pipeline-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 1.5rem 0;
+  position: relative;
+}
+.pipeline-steps::before {
+  content: '';
+  position: absolute;
+  left: 19px;
+  top: 20px;
+  bottom: 20px;
+  width: 2px;
+  background: var(--border);
+}
+.pipeline-step {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  padding: 0.75rem 0;
+  position: relative;
+}
+.step-num {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  z-index: 1;
+  font-size: 0.9rem;
+}
+.step-body { flex: 1; padding-top: 8px; }
+.step-body strong { display: block; margin-bottom: 0.25rem; color: var(--text); }
+.step-body p { margin: 0; color: var(--text2); font-size: 0.9rem; }
+
+/* ── Comparison table ── */
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  font-size: 0.9rem;
+}
+.comparison-table th {
+  background: var(--surface2);
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  border-bottom: 2px solid var(--border);
+  color: var(--accent2);
+  font-weight: 600;
+}
+.comparison-table td {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.comparison-table tr:last-child td { border-bottom: none; }
+.comparison-table tr:hover td { background: var(--surface); }
+
+/* ── Slider group ── */
+.slider-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  color: var(--text2);
+}
+.slider-group input[type=range] { width: 100%; }
+
 /* ── Further Reading cards ── */
 .further-reading {
   display: flex;

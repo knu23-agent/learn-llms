@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base href="/learn-llms/">
+  <title>Building Agentic AI — Learn Neural Networks & LLMs</title>
+  <meta name="description" content="How to build agentic AI systems like Claude Code: tool calling, ReAct loops, memory, planning, and building your own coding agent in Python.">
+  <meta name="theme-color" content="#6c63ff">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="progress-bar"></div>
+
+  <header>
+    <div class="site-title">
+      <span class="logo">🧠</span>
+      <a href="index.html" style="color:inherit;text-decoration:none;">Learn Neural Networks &amp; LLMs</a>
+    </div>
+    <div class="header-nav">
+      <a href="index.html">← All Chapters</a>
+      <button id="theme-toggle" aria-label="Toggle theme">☀️ Light</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="chapter-container">
+
+      <div class="chapter-meta">
+        <span class="chap-num">Chapter 9 of 9</span>
+      </div>
+
+      <h1>🤖 Building Agentic AI</h1>
+      <p class="chapter-intro">
+        An LLM that just answers questions is a chatbot. An LLM that can take actions,
+        use tools, remember state, and pursue goals across multiple steps — that's an agent.
+        This chapter explains how tools like Claude Code, Devin, and Cursor work,
+        and how to build your own.
+      </p>
+
+      <h2>What Makes Something an "Agent"?</h2>
+      <div class="callout">
+        <strong>An agent is an LLM in a loop.</strong> It perceives its environment (context),
+        decides what to do (tool call or final answer), acts (executes the tool),
+        observes the result, and loops until the task is complete.
+      </div>
+
+      <p>The key properties that distinguish agents from plain LLMs:</p>
+      <ul>
+        <li><strong>Tool use</strong> — can call external functions (run code, search the web, read files)</li>
+        <li><strong>Multi-step reasoning</strong> — plans and executes sequences of actions</li>
+        <li><strong>State / memory</strong> — remembers what happened earlier in the task</li>
+        <li><strong>Self-correction</strong> — sees tool output and adjusts plans accordingly</li>
+        <li><strong>Goal-directedness</strong> — works toward a specified objective, not just next-token prediction</li>
+      </ul>
+
+      <h2>The ReAct Pattern</h2>
+      <p><strong>ReAct</strong> (Reasoning + Acting) is the most common agent architecture.
+        The model alternates between thinking and doing:</p>
+
+      <pre><code>Thought: I need to find the population of Tokyo.
+Action: search("Tokyo population 2024")
+Observation: Tokyo has a population of approximately 13.96 million (city).
+
+Thought: I have the answer. I should also note the greater metro area.
+Action: search("Tokyo metropolitan area population")
+Observation: Greater Tokyo Area has ~37 million people.
+
+Thought: Now I can answer the question.
+Final Answer: Tokyo city has ~14M people; the greater metro area ~37M.</code></pre>
+
+      <p>The model generates "Thought:" and "Action:" tokens; the framework parses the
+        action, runs it, and appends "Observation:" with the result — feeding everything
+        back into the context for the next iteration.</p>
+
+      <h2>Tool Calling in Practice</h2>
+      <p>Modern LLM APIs support structured tool calling natively. You define tools as
+        JSON schemas; the model decides when and how to call them:</p>
+
+      <pre><code><span class="code-kw">from</span> openai <span class="code-kw">import</span> OpenAI
+<span class="code-kw">import</span> json
+
+client = OpenAI()
+
+<span class="code-comment"># Define tools as JSON schemas</span>
+tools = [
+    {
+        <span class="code-str">"type"</span>: <span class="code-str">"function"</span>,
+        <span class="code-str">"function"</span>: {
+            <span class="code-str">"name"</span>: <span class="code-str">"run_python"</span>,
+            <span class="code-str">"description"</span>: <span class="code-str">"Execute Python code and return stdout/stderr"</span>,
+            <span class="code-str">"parameters"</span>: {
+                <span class="code-str">"type"</span>: <span class="code-str">"object"</span>,
+                <span class="code-str">"properties"</span>: {
+                    <span class="code-str">"code"</span>: {<span class="code-str">"type"</span>: <span class="code-str">"string"</span>, <span class="code-str">"description"</span>: <span class="code-str">"Python code to execute"</span>}
+                },
+                <span class="code-str">"required"</span>: [<span class="code-str">"code"</span>]
+            }
+        }
+    },
+    {
+        <span class="code-str">"type"</span>: <span class="code-str">"function"</span>,
+        <span class="code-str">"function"</span>: {
+            <span class="code-str">"name"</span>: <span class="code-str">"read_file"</span>,
+            <span class="code-str">"description"</span>: <span class="code-str">"Read a file from the filesystem"</span>,
+            <span class="code-str">"parameters"</span>: {
+                <span class="code-str">"type"</span>: <span class="code-str">"object"</span>,
+                <span class="code-str">"properties"</span>: {
+                    <span class="code-str">"path"</span>: {<span class="code-str">"type"</span>: <span class="code-str">"string"</span>, <span class="code-str">"description"</span>: <span class="code-str">"File path to read"</span>}
+                },
+                <span class="code-str">"required"</span>: [<span class="code-str">"path"</span>]
+            }
+        }
+    }
+]</code></pre>
+
+      <h2>The Agent Loop</h2>
+      <p>The core of any agent is a loop: call the LLM, handle tool calls, feed results back:</p>
+
+      <pre><code><span class="code-kw">import</span> subprocess, json
+<span class="code-kw">from</span> openai <span class="code-kw">import</span> OpenAI
+
+client = OpenAI()
+
+<span class="code-comment"># Tool implementations</span>
+<span class="code-kw">def</span> <span class="code-fn">run_python</span>(code):
+    result = subprocess.run(
+        [<span class="code-str">"python3"</span>, <span class="code-str">"-c"</span>, code],
+        capture_output=<span class="code-kw">True</span>, text=<span class="code-kw">True</span>, timeout=<span class="code-num">10</span>
+    )
+    <span class="code-kw">return</span> result.stdout + result.stderr
+
+<span class="code-kw">def</span> <span class="code-fn">read_file</span>(path):
+    <span class="code-kw">try</span>:
+        <span class="code-kw">with</span> open(path) <span class="code-kw">as</span> f: <span class="code-kw">return</span> f.read()
+    <span class="code-kw">except</span> Exception <span class="code-kw">as</span> e: <span class="code-kw">return</span> str(e)
+
+TOOL_MAP = {<span class="code-str">"run_python"</span>: run_python, <span class="code-str">"read_file"</span>: read_file}
+
+<span class="code-kw">def</span> <span class="code-fn">run_agent</span>(user_task, max_steps=<span class="code-num">10</span>):
+    messages = [
+        {<span class="code-str">"role"</span>: <span class="code-str">"system"</span>, <span class="code-str">"content"</span>: <span class="code-str">"You are a coding agent. Use tools to complete tasks."</span>},
+        {<span class="code-str">"role"</span>: <span class="code-str">"user"</span>, <span class="code-str">"content"</span>: user_task},
+    ]
+
+    <span class="code-kw">for</span> step <span class="code-kw">in</span> range(max_steps):
+        response = client.chat.completions.create(
+            model=<span class="code-str">"gpt-4o"</span>,
+            messages=messages,
+            tools=tools,
+            tool_choice=<span class="code-str">"auto"</span>,
+        )
+        msg = response.choices[<span class="code-num">0</span>].message
+        messages.append(msg)
+
+        <span class="code-comment"># No tool calls → final answer</span>
+        <span class="code-kw">if</span> <span class="code-kw">not</span> msg.tool_calls:
+            <span class="code-kw">return</span> msg.content
+
+        <span class="code-comment"># Execute each tool call</span>
+        <span class="code-kw">for</span> call <span class="code-kw">in</span> msg.tool_calls:
+            fn = call.function.name
+            args = json.loads(call.function.arguments)
+            result = TOOL_MAP[fn](**args)   <span class="code-comment"># call the real function</span>
+
+            messages.append({
+                <span class="code-str">"role"</span>: <span class="code-str">"tool"</span>,
+                <span class="code-str">"tool_call_id"</span>: call.id,
+                <span class="code-str">"content"</span>: result,
+            })
+
+    <span class="code-kw">return</span> <span class="code-str">"Max steps reached."</span>
+
+<span class="code-comment"># Run it!</span>
+answer = run_agent(<span class="code-str">"Write a Python function to calculate Fibonacci numbers, then test it."</span>)
+print(answer)</code></pre>
+
+      <h2>How Claude Code Works (Conceptually)</h2>
+      <div class="callout">
+        <strong>Claude Code, Cursor, Devin, and similar tools are all variants of this same loop</strong>
+        — but with more sophisticated tools, memory systems, and safety layers.
+      </div>
+
+      <p>What a coding agent like Claude Code does internally:</p>
+
+      <div class="pipeline-steps">
+        <div class="pipeline-step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Context loading</strong>
+            <p>Reads the user's task + loads relevant files, git history, directory structure.
+               Builds a rich context window: "here is the codebase, here is what you need to do."</p>
+          </div>
+        </div>
+        <div class="pipeline-step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Planning</strong>
+            <p>Reasons about what steps are needed. May produce a plan explicitly ("first I'll read X,
+               then edit Y, then run tests") or implicitly through tool selection.</p>
+          </div>
+        </div>
+        <div class="pipeline-step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <strong>Tool execution</strong>
+            <p>Calls tools: <code>read_file</code>, <code>write_file</code>, <code>run_bash</code>,
+               <code>search_codebase</code>. Each result is fed back into context.</p>
+          </div>
+        </div>
+        <div class="pipeline-step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <strong>Verification</strong>
+            <p>Runs tests, checks output, reads compiler errors. If something fails,
+               reasons about why and tries a different approach.</p>
+          </div>
+        </div>
+        <div class="pipeline-step">
+          <div class="step-num">5</div>
+          <div class="step-body">
+            <strong>Completion / escalation</strong>
+            <p>When confident the task is done, returns the result.
+               If stuck or uncertain, asks the human for clarification.</p>
+          </div>
+        </div>
+      </div>
+
+      <h2>Memory Systems</h2>
+      <p>Agents need different types of memory to work on complex tasks:</p>
+
+      <table class="comparison-table">
+        <thead>
+          <tr><th>Type</th><th>What it is</th><th>How to implement</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>In-context</strong></td>
+            <td>The conversation history in the prompt</td>
+            <td>Just keep appending to messages</td>
+          </tr>
+          <tr>
+            <td><strong>External (files)</strong></td>
+            <td>Notes written to disk between sessions</td>
+            <td><code>write_file("memory.md", notes)</code></td>
+          </tr>
+          <tr>
+            <td><strong>Vector store</strong></td>
+            <td>Semantic search over past events/docs</td>
+            <td>Embed text → store in Chroma/Pinecone → retrieve by similarity</td>
+          </tr>
+          <tr>
+            <td><strong>Episodic</strong></td>
+            <td>Structured log of past actions and outcomes</td>
+            <td>Append JSON records, summarize periodically</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Multi-Agent Systems</h2>
+      <p>Complex tasks can be split across specialized agents that communicate:</p>
+
+      <pre><code><span class="code-comment"># Orchestrator / sub-agent pattern</span>
+
+<span class="code-comment"># Orchestrator decides what to delegate</span>
+orchestrator_prompt = <span class="code-str">"""
+You are a project manager agent. You have access to sub-agents:
+- researcher: finds information
+- coder: writes and runs code  
+- reviewer: checks code quality
+
+Break the user's task into subtasks and delegate.
+"""</span>
+
+<span class="code-comment"># Each sub-agent has its own tools and system prompt</span>
+researcher = Agent(tools=[web_search, read_url], system=<span class="code-str">"You find information."</span>)
+coder = Agent(tools=[run_python, write_file], system=<span class="code-str">"You write code."</span>)
+reviewer = Agent(tools=[read_file, run_tests], system=<span class="code-str">"You review code."</span>)</code></pre>
+
+      <h2>Building a Minimal Coding Agent: Full Example</h2>
+      <p>Here's a complete, runnable coding agent using the Anthropic API and Claude:</p>
+
+      <div class="code-block-wrap">
+        <button class="copy-btn" aria-label="Copy code">Copy</button>
+        <pre><code><span class="code-comment"># pip install anthropic</span>
+<span class="code-kw">import</span> anthropic, subprocess, os, json
+
+client = anthropic.Anthropic()
+
+<span class="code-comment"># --- Tool definitions ---</span>
+TOOLS = [
+    {
+        <span class="code-str">"name"</span>: <span class="code-str">"bash"</span>,
+        <span class="code-str">"description"</span>: <span class="code-str">"Run a bash command. Returns stdout + stderr."</span>,
+        <span class="code-str">"input_schema"</span>: {
+            <span class="code-str">"type"</span>: <span class="code-str">"object"</span>,
+            <span class="code-str">"properties"</span>: {<span class="code-str">"command"</span>: {<span class="code-str">"type"</span>: <span class="code-str">"string"</span>}},
+            <span class="code-str">"required"</span>: [<span class="code-str">"command"</span>]
+        }
+    },
+    {
+        <span class="code-str">"name"</span>: <span class="code-str">"write_file"</span>,
+        <span class="code-str">"description"</span>: <span class="code-str">"Write content to a file."</span>,
+        <span class="code-str">"input_schema"</span>: {
+            <span class="code-str">"type"</span>: <span class="code-str">"object"</span>,
+            <span class="code-str">"properties"</span>: {
+                <span class="code-str">"path"</span>: {<span class="code-str">"type"</span>: <span class="code-str">"string"</span>},
+                <span class="code-str">"content"</span>: {<span class="code-str">"type"</span>: <span class="code-str">"string"</span>}
+            },
+            <span class="code-str">"required"</span>: [<span class="code-str">"path"</span>, <span class="code-str">"content"</span>]
+        }
+    },
+    {
+        <span class="code-str">"name"</span>: <span class="code-str">"read_file"</span>,
+        <span class="code-str">"description"</span>: <span class="code-str">"Read a file's contents."</span>,
+        <span class="code-str">"input_schema"</span>: {
+            <span class="code-str">"type"</span>: <span class="code-str">"object"</span>,
+            <span class="code-str">"properties"</span>: {<span class="code-str">"path"</span>: {<span class="code-str">"type"</span>: <span class="code-str">"string"</span>}},
+            <span class="code-str">"required"</span>: [<span class="code-str">"path"</span>]
+        }
+    }
+]
+
+<span class="code-comment"># --- Tool implementations ---</span>
+<span class="code-kw">def</span> <span class="code-fn">run_bash</span>(command):
+    <span class="code-kw">try</span>:
+        r = subprocess.run(command, shell=<span class="code-kw">True</span>, capture_output=<span class="code-kw">True</span>,
+                           text=<span class="code-kw">True</span>, timeout=<span class="code-num">30</span>)
+        out = r.stdout + r.stderr
+        <span class="code-kw">return</span> out[:<span class="code-num">4000</span>] <span class="code-kw">if</span> out <span class="code-kw">else</span> <span class="code-str">"(no output)"</span>
+    <span class="code-kw">except</span> subprocess.TimeoutExpired:
+        <span class="code-kw">return</span> <span class="code-str">"Error: command timed out"</span>
+
+<span class="code-kw">def</span> <span class="code-fn">write_file</span>(path, content):
+    os.makedirs(os.path.dirname(path) <span class="code-kw">or</span> <span class="code-str">"."</span>, exist_ok=<span class="code-kw">True</span>)
+    <span class="code-kw">with</span> open(path, <span class="code-str">"w"</span>) <span class="code-kw">as</span> f: f.write(content)
+    <span class="code-kw">return</span> <span class="code-fn">f</span><span class="code-str">"Written {len(content)} chars to {path}"</span>
+
+<span class="code-kw">def</span> <span class="code-fn">read_file</span>(path):
+    <span class="code-kw">try</span>:
+        <span class="code-kw">with</span> open(path) <span class="code-kw">as</span> f: <span class="code-kw">return</span> f.read()[:<span class="code-num">8000</span>]
+    <span class="code-kw">except</span> FileNotFoundError:
+        <span class="code-kw">return</span> <span class="code-fn">f</span><span class="code-str">"File not found: {path}"</span>
+
+TOOL_MAP = {<span class="code-str">"bash"</span>: run_bash, <span class="code-str">"write_file"</span>: write_file, <span class="code-str">"read_file"</span>: read_file}
+
+<span class="code-comment"># --- Agent loop ---</span>
+<span class="code-kw">def</span> <span class="code-fn">run_coding_agent</span>(task):
+    messages = [{<span class="code-str">"role"</span>: <span class="code-str">"user"</span>, <span class="code-str">"content"</span>: task}]
+
+    <span class="code-kw">for</span> step <span class="code-kw">in</span> range(<span class="code-num">20</span>):
+        response = client.messages.create(
+            model=<span class="code-str">"claude-opus-4-5"</span>,
+            max_tokens=<span class="code-num">4096</span>,
+            system=<span class="code-str">"""You are an expert coding agent. 
+Think step-by-step. Use tools to write code, run it, and fix errors.
+When the task is complete, summarize what you did."""</span>,
+            tools=TOOLS,
+            messages=messages,
+        )
+
+        <span class="code-comment"># Add assistant turn to history</span>
+        messages.append({<span class="code-str">"role"</span>: <span class="code-str">"assistant"</span>, <span class="code-str">"content"</span>: response.content})
+
+        <span class="code-comment"># Stop if done</span>
+        <span class="code-kw">if</span> response.stop_reason == <span class="code-str">"end_turn"</span>:
+            <span class="code-kw">for</span> block <span class="code-kw">in</span> response.content:
+                <span class="code-kw">if</span> hasattr(block, <span class="code-str">"text"</span>):
+                    print(block.text)
+            <span class="code-kw">return</span>
+
+        <span class="code-comment"># Process tool calls</span>
+        tool_results = []
+        <span class="code-kw">for</span> block <span class="code-kw">in</span> response.content:
+            <span class="code-kw">if</span> block.type == <span class="code-str">"tool_use"</span>:
+                print(<span class="code-fn">f</span><span class="code-str">"[{block.name}] {json.dumps(block.input)[:80]}..."</span>)
+                result = TOOL_MAP[block.name](**block.input)
+                tool_results.append({
+                    <span class="code-str">"type"</span>: <span class="code-str">"tool_result"</span>,
+                    <span class="code-str">"tool_use_id"</span>: block.id,
+                    <span class="code-str">"content"</span>: result,
+                })
+
+        messages.append({<span class="code-str">"role"</span>: <span class="code-str">"user"</span>, <span class="code-str">"content"</span>: tool_results})
+
+<span class="code-comment"># Try it!</span>
+run_coding_agent(<span class="code-str">"""
+Create a Python script that:
+1. Generates a list of 10 random numbers between 1 and 100
+2. Sorts them
+3. Computes mean and median
+4. Saves the results to results.txt
+5. Run it and show the output.
+"""</span>)</code></pre>
+      </div>
+
+      <h2>Safety and Control</h2>
+      <div class="callout">
+        <strong>Agents are powerful and risky.</strong> A bug or misunderstanding can lead to
+        deleting files, sending emails, or making API calls you didn't intend.
+        Always build in human oversight, especially for irreversible actions.
+      </div>
+
+      <p>Essential safety patterns:</p>
+      <ul>
+        <li><strong>Sandboxing</strong> — run code in Docker containers, not on your host machine</li>
+        <li><strong>Confirmation for destructive actions</strong> — ask before deleting, deploying, or sending</li>
+        <li><strong>Budget limits</strong> — cap API calls, tokens, and time per task</li>
+        <li><strong>Audit logging</strong> — record every action the agent takes</li>
+        <li><strong>Scoped permissions</strong> — give the agent only the access it needs for the task</li>
+        <li><strong>Reversibility</strong> — prefer operations that can be undone (git commits, not <code>rm -rf</code>)</li>
+      </ul>
+
+      <pre><code><span class="code-comment"># Sandboxed execution with Docker</span>
+<span class="code-kw">def</span> <span class="code-fn">run_python_sandboxed</span>(code):
+    result = subprocess.run([
+        <span class="code-str">"docker"</span>, <span class="code-str">"run"</span>, <span class="code-str">"--rm"</span>,
+        <span class="code-str">"--network=none"</span>,          <span class="code-comment"># no internet access</span>
+        <span class="code-str">"--memory=256m"</span>,            <span class="code-comment"># memory limit</span>
+        <span class="code-str">"--cpus=1"</span>,                  <span class="code-comment"># CPU limit</span>
+        <span class="code-str">"--read-only"</span>,              <span class="code-comment"># read-only filesystem</span>
+        <span class="code-str">"python:3.11-slim"</span>,
+        <span class="code-str">"python3"</span>, <span class="code-str">"-c"</span>, code
+    ], capture_output=<span class="code-kw">True</span>, text=<span class="code-kw">True</span>, timeout=<span class="code-num">15</span>)
+    <span class="code-kw">return</span> result.stdout + result.stderr</code></pre>
+
+      <h2>🎮 Interactive Demo: Trace the Agent Loop</h2>
+      <p>Step through an example agent run. Click <strong>Next Step</strong> to advance the loop
+        and see what the agent thinks, does, and observes at each step.</p>
+
+      <div class="demo-box">
+        <div style="margin-bottom:1rem;padding:0.75rem;background:var(--surface);border-radius:6px;font-size:0.9rem;">
+          <strong>Task:</strong> "Write a Python function to check if a number is prime, then test it with a few values."
+        </div>
+        <div style="display:flex;gap:0.75rem;margin-bottom:1rem;">
+          <button id="next-step-btn" class="btn-demo">▶ Next Step</button>
+          <button id="reset-agent-btn" class="btn-demo btn-secondary">↺ Reset</button>
+          <span id="step-counter" style="align-self:center;color:var(--text2);font-size:0.9rem;">Step 0 / 4</span>
+        </div>
+        <div id="agent-trace" style="display:flex;flex-direction:column;gap:0.75rem;"></div>
+      </div>
+
+      <h2>Further Reading</h2>
+      <div class="further-reading">
+        <a href="https://arxiv.org/abs/2210.03629" target="_blank" rel="noopener" class="reading-card">
+          <div class="reading-icon">📄</div>
+          <div>
+            <strong>ReAct: Synergizing Reasoning and Acting in LLMs</strong>
+            <p>The original paper introducing the ReAct pattern. Short and very readable.</p>
+          </div>
+        </a>
+        <a href="https://docs.anthropic.com/en/docs/build-with-claude/tool-use" target="_blank" rel="noopener" class="reading-card">
+          <div class="reading-icon">🔧</div>
+          <div>
+            <strong>Anthropic Tool Use Docs</strong>
+            <p>Official guide to Claude's tool calling API — the foundation of agentic Claude apps.</p>
+          </div>
+        </a>
+        <a href="https://langchain-ai.github.io/langgraph/" target="_blank" rel="noopener" class="reading-card">
+          <div class="reading-icon">🕸️</div>
+          <div>
+            <strong>LangGraph</strong>
+            <p>Framework for building stateful, multi-actor agentic applications with LLMs.</p>
+          </div>
+        </a>
+        <a href="https://github.com/openai/swarm" target="_blank" rel="noopener" class="reading-card">
+          <div class="reading-icon">🐝</div>
+          <div>
+            <strong>OpenAI Swarm</strong>
+            <p>Lightweight educational framework for exploring multi-agent orchestration patterns.</p>
+          </div>
+        </a>
+      </div>
+
+      <nav class="prev-next">
+        <a href="chapters/08-evaluation.html" class="prev-btn">← Chapter 8: Evaluation</a>
+        <a href="index.html" class="next-btn">Back to Start 🏠</a>
+      </nav>
+
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+  <script>
+    const steps = [
+      {
+        type: 'thought',
+        label: '💭 Thought',
+        color: 'var(--accent)',
+        text: 'I need to write a function to check primality, test it with some values, then verify the output is correct. Let me start by writing the code.',
+      },
+      {
+        type: 'action',
+        label: '🔧 Action: bash',
+        color: 'var(--orange)',
+        text: `python3 -c "
+def is_prime(n):
+    if n < 2: return False
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0: return False
+    return True
+
+test_cases = [1, 2, 3, 4, 13, 17, 25, 97]
+for n in test_cases:
+    print(f'{n}: {is_prime(n)}')
+"`,
+      },
+      {
+        type: 'observation',
+        label: '👀 Observation',
+        color: 'var(--green)',
+        text: `1: False
+2: True
+3: True
+4: False
+13: True
+17: True
+25: False
+97: True`,
+      },
+      {
+        type: 'thought',
+        label: '💭 Thought',
+        color: 'var(--accent)',
+        text: 'The function works correctly. 1 is not prime (correct), 2 and 3 are prime (correct), 4 and 25 are composite (correct), and 97 is prime (correct). The implementation is clean and handles edge cases.',
+      },
+      {
+        type: 'final',
+        label: '✅ Final Answer',
+        color: 'var(--green)',
+        text: "I've written and tested an `is_prime(n)` function. It works correctly for all test cases including edge cases (n=1, n=2). The algorithm runs in O(√n) time by only checking divisors up to the square root.",
+      },
+    ];
+
+    let currentStep = 0;
+
+    function renderStep(step) {
+      const div = document.createElement('div');
+      div.style.cssText = `
+        padding:1rem;background:var(--surface);
+        border-left:4px solid ${step.color};
+        border-radius:0 8px 8px 0;
+        font-family:${step.type === 'action' || step.type === 'observation' ? 'monospace' : 'system-ui'};
+        font-size:0.9rem;
+        opacity:0;transition:opacity 0.3s;
+      `;
+      div.innerHTML = `<div style="color:${step.color};font-weight:700;margin-bottom:0.5rem;font-family:system-ui;">${step.label}</div><pre style="margin:0;white-space:pre-wrap;color:var(--text);">${step.text}</pre>`;
+      setTimeout(() => div.style.opacity = '1', 10);
+      return div;
+    }
+
+    document.getElementById('next-step-btn').addEventListener('click', () => {
+      if (currentStep >= steps.length) return;
+      const trace = document.getElementById('agent-trace');
+      trace.appendChild(renderStep(steps[currentStep]));
+      currentStep++;
+      document.getElementById('step-counter').textContent = `Step ${currentStep} / ${steps.length}`;
+      if (currentStep >= steps.length) {
+        document.getElementById('next-step-btn').disabled = true;
+        document.getElementById('next-step-btn').textContent = '✓ Done';
+      }
+    });
+
+    document.getElementById('reset-agent-btn').addEventListener('click', () => {
+      currentStep = 0;
+      document.getElementById('agent-trace').innerHTML = '';
+      document.getElementById('step-counter').textContent = 'Step 0 / ' + steps.length;
+      document.getElementById('next-step-btn').disabled = false;
+      document.getElementById('next-step-btn').textContent = '▶ Next Step';
+    });
+  </script>
+</body>
+</html>
