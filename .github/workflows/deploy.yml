@@ -1,0 +1,33 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get commit hash
+        id: hash
+        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Stamp SW cache key with commit hash
+        run: sed -i "s/__COMMIT_HASH__/${{ steps.hash.outputs.sha }}/g" sw.js
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: .
+          exclude_assets: '.github,deploy.sh'
+          commit_message: "deploy: ${{ steps.hash.outputs.sha }} — cache busted to learn-llms-${{ steps.hash.outputs.sha }}"
